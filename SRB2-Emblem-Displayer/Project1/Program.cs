@@ -49,15 +49,26 @@ namespace CountEmblems
         }
         static void Main()
         {
+            string fileName = "";
+            string outputName = "";
+
+            try
+            {
+                string[] lines = File.ReadAllLines("path.ini");
+                fileName = lines[0];
+                outputName = lines[1];
+            }
+            catch
+            {
+                Console.WriteLine("Unable to read the paths file");
+            }
             previousTotal = -1;
-            Console.Write("Game data file: ");
-            string fileName = Console.ReadLine();
-            Console.Write("Output file: ");
-            string outputName = Console.ReadLine();
+            Console.Write("Game data file: " + fileName + "\n");
+            Console.Write("Output file: " + outputName);
             while (true)
             {
                 Analyze_file(fileName, outputName);
-                Thread.Sleep(200);
+                Thread.Sleep(100);
             }
         }
     }
