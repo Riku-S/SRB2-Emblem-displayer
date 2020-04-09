@@ -16,37 +16,35 @@ namespace CountEmblems
             bytes = bytes.Skip(1).ToArray();
             return value;
         }
+        static int CountEmblems(ref byte[] bytes, int max_emblems)
+        {
+            int result = 0;
+            for (int i = 0; i < max_emblems;)
+            {
+                int j;
+                byte rtemp = ReadByte(ref bytes);
+                for (j = 0; j < 8 && j + i < MAXEMBLEMS; ++j)
+                    result += ((rtemp >> j) & 1);
+                i += j;
+            }
+            return result;
+        }
         static void Analyze_file(string fileName, string outputName)
         {
             byte[] bytes = File.ReadAllBytes(fileName);
 
-            bytes = bytes.Skip(1036).ToArray();
+            // 4 (version check) + 4 (playtime) + 1 (modified) + 1035 (maps visited)
+            bytes = bytes.Skip(1044).ToArray();
 
-            int emblems = 0;
-            for (int i = 0; i < MAXEMBLEMS;)
-            {
-                int j;
-                byte rtemp = ReadByte(ref bytes);
-                for (j = 0; j < 8 && j + i < MAXEMBLEMS; ++j)
-                    emblems += ((rtemp >> j) & 1);
-                i += j;
-            }
-
-            int extraEmblems = 0;
-            for (int i = 0; i < MAXEXTRAEMBLEMS;)
-            {
-                int j;
-                byte rtemp = ReadByte(ref bytes);
-                for (j = 0; j < 8 && j + i < MAXEMBLEMS; ++j)
-                    extraEmblems += ((rtemp >> j) & 1);
-                i += j;
-            }
-            int total = (emblems + extraEmblems);
+            int emblems = CountEmblems(ref bytes, MAXEMBLEMS);
+            int extraEmblems = CountEmblems(ref bytes, MAXEXTRAEMBLEMS);
+            int total = emblems + extraEmblems;
 
             if (total != previousTotal)
             {
                 File.WriteAllText(outputName, total.ToString());
                 previousTotal = total;
+                Console.WriteLine("Emblems: " + total);
             }
         }
         static void Main()
