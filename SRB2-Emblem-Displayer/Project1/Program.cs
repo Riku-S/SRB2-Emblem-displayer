@@ -103,6 +103,10 @@ namespace CountEmblems
                 }
             }
         }
+        static void MenuExit(object sender, EventArgs e)
+        {
+            Environment.Exit(0);
+        }
         [STAThread]
         static void Main()
         {
@@ -121,6 +125,19 @@ namespace CountEmblems
             emblemLabel.AutoSize = true;
             emblemLabel.ForeColor = Color.FromArgb(255, 255, 255);
             emblemLabel.Font = new Font("AzureoN", 20, FontStyle.Bold, GraphicsUnit.Point);
+
+            EventHandler exitHandler = new EventHandler(MenuExit);
+
+            ContextMenu menu = new ContextMenu();
+            menu.MenuItems.Add("input/output options (not yet)");
+            menu.MenuItems.Add("-");
+            menu.MenuItems.Add("Save layout (not yet)");
+            menu.MenuItems.Add("Edit layout (not yet)");
+            menu.MenuItems.Add("Load layout (not yet)");
+            menu.MenuItems.Add("-");
+            menu.MenuItems.Add("Exit", exitHandler);
+
+            myform.ContextMenu = menu;
 
             new Thread(() =>
             {
