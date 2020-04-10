@@ -3,8 +3,6 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
-using System.Diagnostics;
-using System.Runtime.InteropServices;
 using System.Drawing;
 
 namespace CountEmblems
@@ -84,7 +82,10 @@ namespace CountEmblems
             {
                 try
                 {
-                    emblemLabel.Text = total.ToString();
+                    emblemLabel.Invoke(new MethodInvoker(delegate
+                    {
+                        emblemLabel.Text = total.ToString();
+                    }));
                     File.WriteAllText(outputName, total.ToString());
                     previousTotal = total;
                     Console.WriteLine("Emblems: " + total);
@@ -106,7 +107,7 @@ namespace CountEmblems
         static void Main()
         {
             myform = new Form();
-            myform.ClientSize = new Size(200, 200);
+            myform.ClientSize = new Size(1000, 200);
             myform.MinimizeBox = false;
             myform.MaximizeBox = false;
             myform.FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -119,6 +120,7 @@ namespace CountEmblems
             emblemLabel.Location = new Point(10, 10);
             emblemLabel.AutoSize = true;
             emblemLabel.ForeColor = Color.FromArgb(255, 255, 255);
+            emblemLabel.Font = new Font("AzureoN", 20, FontStyle.Bold, GraphicsUnit.Point);
 
             new Thread(() =>
             {
