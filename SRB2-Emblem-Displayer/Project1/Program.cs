@@ -16,7 +16,8 @@ namespace CountEmblems
         const int SKIPPED_BYTES = 1044;
         const int MAXEMBLEMS = 512;
         const int MAXEXTRAEMBLEMS = 16;
-        const int EXIT_TIME = 3000;
+        const int EXIT_TIME = 10000;
+        const int NO_PREVIOUS_TOTAL = -1;
         const string INI_NAME = "path.ini";
         static byte ReadByte(ref byte[] bytes)
         {
@@ -41,7 +42,7 @@ namespace CountEmblems
         static void Analyze_file(string fileName, string outputName)
         {
             byte[] bytes;
-            int total = 0;
+            int total = previousTotal;
             try
             {
                 bytes = File.ReadAllBytes(fileName);
@@ -69,10 +70,14 @@ namespace CountEmblems
                     previousError = errorName;
                 }
             }
-            if (total != previousTotal)
+            if (total != previousTotal || total == NO_PREVIOUS_TOTAL)
             {
                 try
                 {
+                    if (total == NO_PREVIOUS_TOTAL)
+                    {
+                        total = 0;
+                    }
                     File.WriteAllText(outputName, total.ToString());
                     previousTotal = total;
                     Console.WriteLine("Emblems: " + total);
@@ -125,7 +130,7 @@ namespace CountEmblems
                 return;
             }
             // We want to change the number in the output file on the first loop
-            previousTotal = -1;
+            previousTotal = NO_PREVIOUS_TOTAL;
             Console.WriteLine("Game data file: " + fileName);
             Console.WriteLine("Output file: " + outputName);
             while (true)
