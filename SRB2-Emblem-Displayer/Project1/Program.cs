@@ -70,14 +70,14 @@ namespace CountEmblems
                     previousError = errorName;
                 }
             }
-            if (total != previousTotal || total == NO_PREVIOUS_TOTAL)
+            if (total == NO_PREVIOUS_TOTAL)
+            {
+                total = 0;
+            }
+            if (total != previousTotal)
             {
                 try
                 {
-                    if (total == NO_PREVIOUS_TOTAL)
-                    {
-                        total = 0;
-                    }
                     File.WriteAllText(outputName, total.ToString());
                     previousTotal = total;
                     Console.WriteLine("Emblems: " + total);
