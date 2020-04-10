@@ -23,6 +23,8 @@ namespace CountEmblems
         const int EXIT_TIME = 10000;
         const int NO_PREVIOUS_TOTAL = -1;
         const string INI_NAME = "path.ini";
+        static Form myform;
+        static Label emblemLabel;
         static byte ReadByte(ref byte[] bytes)
         {
             byte value = bytes[0];
@@ -102,20 +104,30 @@ namespace CountEmblems
         [STAThread]
         static void Main()
         {
-            Form myform = new Form();
+            myform = new Form();
             myform.ClientSize = new Size(200, 200);
             myform.MinimizeBox = false;
             myform.MaximizeBox = false;
             myform.FormBorderStyle = FormBorderStyle.FixedSingle;
             myform.StartPosition = FormStartPosition.CenterScreen;
-            myform.BackColor = Color.FromArgb(0, 0, 0);
+            myform.BackColor = Color.FromArgb(128, 128, 128);
             myform.Text = "SRB2 Emblem Display";
-            
+
+            emblemLabel = new Label();
+            emblemLabel.Text = "Original text";
+            emblemLabel.Location = new Point(10, 10);
+            emblemLabel.AutoSize = true;
+
             new Thread(() =>
             {
                 Thread.CurrentThread.IsBackground = true;
+                myform.Controls.Add(emblemLabel);
                 myform.ShowDialog();
+
             }).Start();
+
+            emblemLabel.Text = "Modified text";
+
             string fileName = "";
             string outputName = "";
             try
