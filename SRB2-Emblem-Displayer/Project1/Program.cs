@@ -9,19 +9,8 @@ using System.Drawing;
 
 namespace CountEmblems
 {
-    public class Form1 : Form
+    class Program
     {
-        public Form1()
-        {
-            MinimizeBox = false;
-            MaximizeBox = false;
-            FormBorderStyle = FormBorderStyle.FixedSingle;
-            StartPosition = FormStartPosition.CenterScreen;
-            BackColor = Color.FromArgb(0, 0, 0);
-            Text = "SRB2 Emblem Display";
-            ClientSize = new Size(216, 136);
-            ShowDialog();
-        }
         // Previous amount of emblems
         static int previousTotal;
         // Previous error in the loop
@@ -113,11 +102,19 @@ namespace CountEmblems
         [STAThread]
         static void Main()
         {
-            Application.EnableVisualStyles();
-            Application.Run(new Form1());
+            Form myform = new Form();
+            myform.ClientSize = new Size(200, 200);
+            myform.MinimizeBox = false;
+            myform.MaximizeBox = false;
+            myform.FormBorderStyle = FormBorderStyle.FixedSingle;
+            myform.StartPosition = FormStartPosition.CenterScreen;
+            myform.BackColor = Color.FromArgb(0, 0, 0);
+            myform.Text = "SRB2 Emblem Display";
+            
             new Thread(() =>
             {
                 Thread.CurrentThread.IsBackground = true;
+                myform.ShowDialog();
             }).Start();
             string fileName = "";
             string outputName = "";
