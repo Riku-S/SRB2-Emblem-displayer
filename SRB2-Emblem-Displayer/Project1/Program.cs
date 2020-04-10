@@ -2,11 +2,26 @@
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Windows.Forms;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Drawing;
 
 namespace CountEmblems
 {
-    class Program
+    public class Form1 : Form
     {
+        public Form1()
+        {
+            MinimizeBox = false;
+            MaximizeBox = false;
+            FormBorderStyle = FormBorderStyle.FixedSingle;
+            StartPosition = FormStartPosition.CenterScreen;
+            BackColor = Color.FromArgb(0, 0, 0);
+            Text = "SRB2 Emblem Display";
+            ClientSize = new Size(216, 136);
+            ShowDialog();
+        }
         // Previous amount of emblems
         static int previousTotal;
         // Previous error in the loop
@@ -95,8 +110,15 @@ namespace CountEmblems
                 }
             }
         }
+        [STAThread]
         static void Main()
         {
+            Application.EnableVisualStyles();
+            Application.Run(new Form1());
+            new Thread(() =>
+            {
+                Thread.CurrentThread.IsBackground = true;
+            }).Start();
             string fileName = "";
             string outputName = "";
             try
