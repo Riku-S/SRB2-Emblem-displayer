@@ -7,7 +7,7 @@
     <ProjectGuid>{C8A947A1-E4E6-4EFB-A76E-9F714770B32F}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <RootNamespace>Project1</RootNamespace>
-    <AssemblyName>Project1</AssemblyName>
+    <AssemblyName>SRB2 Emblem Displayer</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
@@ -31,8 +31,18 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
+  <PropertyGroup>
+    <ApplicationIcon>srb2 2.2 emblem.ico</ApplicationIcon>
+  </PropertyGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="srb2 2.2 emblem.ico" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
