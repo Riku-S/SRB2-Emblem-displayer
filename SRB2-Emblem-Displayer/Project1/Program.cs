@@ -84,6 +84,7 @@ namespace CountEmblems
             {
                 try
                 {
+                    emblemLabel.Text = total.ToString();
                     File.WriteAllText(outputName, total.ToString());
                     previousTotal = total;
                     Console.WriteLine("Emblems: " + total);
@@ -110,13 +111,14 @@ namespace CountEmblems
             myform.MaximizeBox = false;
             myform.FormBorderStyle = FormBorderStyle.FixedSingle;
             myform.StartPosition = FormStartPosition.CenterScreen;
-            myform.BackColor = Color.FromArgb(128, 128, 128);
+            myform.BackColor = Color.FromArgb(0, 0, 0);
             myform.Text = "SRB2 Emblem Display";
 
             emblemLabel = new Label();
-            emblemLabel.Text = "Original text";
+            emblemLabel.Text = "You shouldn't see this";
             emblemLabel.Location = new Point(10, 10);
             emblemLabel.AutoSize = true;
+            emblemLabel.ForeColor = Color.FromArgb(255, 255, 255);
 
             new Thread(() =>
             {
@@ -125,8 +127,6 @@ namespace CountEmblems
                 myform.ShowDialog();
 
             }).Start();
-
-            emblemLabel.Text = "Modified text";
 
             string fileName = "";
             string outputName = "";
