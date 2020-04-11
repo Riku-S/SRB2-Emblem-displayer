@@ -315,6 +315,18 @@ namespace CountEmblems
                 Environment.Exit(0);
             }
         }
+        static void FormExit(object sender, FormClosingEventArgs e)
+        {
+            bool canceled = UnsavedChanges();
+            if (canceled)
+            {
+                e.Cancel = true;
+            }
+            else
+            {
+                Environment.Exit(0);
+            }
+        }
         static void MenuIO_Options(object sender, EventArgs e)
         {
             previousFileName = fileName;
@@ -569,7 +581,7 @@ namespace CountEmblems
             MainForm.SizeGripStyle = SizeGripStyle.Hide;
             IOForm = MakeForm(new Size(295, 175), Color.FromArgb(240, 240, 240), "I/O Options");
             EditForm = MakeForm(new Size(245, 155), Color.FromArgb(240, 240, 240), "Edit Layout");
-            MainForm.FormClosing += MenuExit;
+            MainForm.FormClosing += FormExit;
             MainForm.ResizeEnd += ResizeEnd;
 
             emblemLabel = new Label();
