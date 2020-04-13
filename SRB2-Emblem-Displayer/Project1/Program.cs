@@ -1096,7 +1096,7 @@ namespace CountEmblems
         [STAThread]
         static void Main()
         {
-            MainForm = MakeForm(new System.Drawing.Size(250, 200), System.Drawing.Color.FromArgb(0, 0, 0), "Text File Display");
+            MainForm = MakeForm(new System.Drawing.Size(250, 200), System.Drawing.Color.FromArgb(0, 0, 0), "SRB2 Emblem Displayer");
             windowWidth = 250;
             windowHeight = 200;
             MainForm.FormBorderStyle = FormBorderStyle.Sizable;
