@@ -4,11 +4,23 @@ using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
 using System.Drawing;
+using System.Windows;
+using System.Windows.Media;
+using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace CountEmblems
 {
     class Program
     {
+        class Outline
+        {
+            public int Thickness;
+            public System.Drawing.Color Color;
+        }
+        static Outline defaultOutline = new Outline { Thickness = 1, Color = System.Drawing.Color.Black };
+        static List<Outline> outlines = new List<Outline>();
+        static List<Outline> previousOutlines;
         // Previous amount of emblems
         static int previousTotal;
         // Previous error in the loop
@@ -17,7 +29,6 @@ namespace CountEmblems
         const int SKIPPED_BYTES = 1044;
         const int MAXEMBLEMS = 512;
         const int MAXEXTRAEMBLEMS = 16;
-        const int EXIT_TIME = 10000;
         const int NO_PREVIOUS_TOTAL = -1;
         const string PREVIOUS_INI_NAME = "previous.ini";
         const string CURRENT_INI_NAME = "current.ini";
@@ -26,14 +37,81 @@ namespace CountEmblems
         static Form MainForm;
         static Form IOForm;
         static Form EditForm;
-        static Label emblemLabel;
-        static Button button2FontColor;
-        static Button button2BackgroundColor;
-        static TextBox gamedataBox;
+        //static System.Windows.Forms.Label emblemLabel;
+        static System.Windows.Forms.Button button2FontColor;
+        static System.Windows.Forms.Button button2FontColor2;
+        static System.Windows.Forms.Button button2BackgroundColor;
+        static System.Windows.Forms.TextBox gamedataBox;
         static TextBox outputBox;
-        static Color previousFontColor;
-        static Color previousBackColor;
+        static System.Drawing.Color previousFontColor;
+        static System.Drawing.Color previousFontColor2;
+        static System.Drawing.Color previousBackColor;
+        static System.Windows.Forms.Button button2OutlineColor;
         static Font previousFont;
+        static int outlineCount = 0;
+        static Button addOutlineButton;
+        static Button removeOutlineButton;
+        static ComboBox outlineMenu;
+        static int previousIndex;
+        static NumericUpDown thicknessUpDown;
+        static Button buttonFontColor2;
+        static NumericUpDown angleUpDown;
+        static System.Windows.Forms.Button buttonOutlineColor;
+        static ComboBox gradientMenu;
+        static NumericUpDown textXUpDown;
+        static NumericUpDown textYUpDown;
+        static System.Drawing.Point previousTextLocation;
+        static System.Drawing.Point textLocationMember = new System.Drawing.Point(30, 30);
+        static System.Drawing.Point textLocation
+        {
+            get { return textLocationMember; }
+            set
+            {
+
+                textLocationMember = value;
+                if (textXUpDown != null && textYUpDown != null)
+                {
+                    textXUpDown.Value = textLocationMember.X;
+                    textYUpDown.Value = textLocationMember.Y;
+                }
+                UpdateText();
+            }
+        }
+        static PictureBox rectangleB;
+        static PictureBox renderBox;
+        static RectangleF rectangle;
+        enum GradientOption
+        {
+            None = 0,
+            Horizontal = 1,
+            Vertical = 2,
+            Custom = 3
+        };
+        static GradientOption currentGradientOptionMember = GradientOption.None;
+        static GradientOption currentGradientOption
+        {
+            get { return currentGradientOptionMember; }
+            set
+            {
+                currentGradientOptionMember = value;
+                if (gradientMenu != null)
+                {
+                    gradientMenu.SelectedIndex = (int)currentGradientOptionMember;
+                }
+            }
+        }
+        static GradientOption previousGradientOption;
+        // The text to show
+        static string textToShowMember;
+        static string textToShow
+        {
+            get { return textToShowMember; }
+            set
+            {
+                textToShowMember = value;
+                UpdateText();
+            }
+        }
 
         // The input file name
         static string fileNameMember;
@@ -49,6 +127,8 @@ namespace CountEmblems
                 }
             }
         }
+
+        // The output file name
         static string outputNameMember;
         static string outputName
         {
@@ -63,26 +143,37 @@ namespace CountEmblems
             }
         }
         // The font's color
-        static Color fontColorMember;
-        static Color fontColor
+        static System.Drawing.Color fontColorMember;
+        static System.Drawing.Color fontColor
         {
             get { return fontColorMember; }
             set
             {
                 fontColorMember = value;
-                if (emblemLabel != null)
-                {
-                    emblemLabel.ForeColor = value;
-                }
                 if (button2FontColor != null)
                 {
                     button2FontColor.BackColor = value;
                 }
+                UpdateText();
+            }
+        }
+        static System.Drawing.Color fontColor2Member;
+        static System.Drawing.Color fontColor2
+        {
+            get { return fontColor2Member; }
+            set
+            {
+                fontColor2Member = value;
+                if (button2FontColor2 != null)
+                {
+                    button2FontColor2.BackColor = value;
+                }
+                UpdateText();
             }
         }
         // The background's color
-        static Color backColorMember;
-        static Color backColor
+        static System.Drawing.Color backColorMember;
+        static System.Drawing.Color backColor
         {
             get { return backColorMember; }
             set
@@ -92,10 +183,11 @@ namespace CountEmblems
                 {
                     button2BackgroundColor.BackColor = value;
                 }
-                if (MainForm != null)
+                /*if (MainForm != null)
                 {
                     MainForm.BackColor = value;
-                }
+                }*/
+                UpdateText();
             }
         }
         // The font
@@ -106,10 +198,11 @@ namespace CountEmblems
             set
             {
                 currentFontMember = value;
-                if (emblemLabel != null)
-                {
-                    emblemLabel.Font = value;
-                }
+                //if (emblemLabel != null)
+                //{
+                //    emblemLabel.Font = value;
+                //}
+                UpdateText();
             }
         }
 
@@ -140,6 +233,64 @@ namespace CountEmblems
             }
         }
 
+        //The outline color
+        static System.Drawing.Color outlineColorMember;
+        static System.Drawing.Color outlineColor
+        {
+            get { return outlineColorMember; }
+            set
+            {
+                outlineColorMember = value;
+                if (button2OutlineColor != null)
+                {
+                    button2OutlineColor.BackColor = value;
+                    if (outlines.Count > 0 && outlineMenu.SelectedIndex >= 0)
+                    {
+                        outlines[outlineMenu.SelectedIndex].Color = value;
+                    }
+                }
+                UpdateText();
+            }
+        }
+
+        //The outline thickness
+        static int outlineThicknessMember;
+        static int outlineThickness
+        {
+            get { return outlineThicknessMember; }
+            set
+            {
+                outlineThicknessMember = value;
+                if (thicknessUpDown != null)
+                {
+                    thicknessUpDown.Value = value;
+                    if (outlines.Count > 0 && outlineMenu.SelectedIndex >= 0)
+                    {
+                        outlines[outlineMenu.SelectedIndex].Thickness = value;
+                    }
+                }
+                UpdateText();
+            }
+        }
+        static int previousCustomAngle;
+        static int customAngleMember;
+        static int customAngle
+        {
+            get { return customAngleMember; }
+            set
+            {
+                customAngleMember = value;
+                if (angleUpDown != null)
+                {
+                    angleUpDown.Value = value;
+                    if (currentGradientOption == GradientOption.Custom)
+                    {
+                        //do the thing
+                    }
+                }
+                UpdateText();
+            }
+        }
         static byte ReadByte(ref byte[] bytes)
         {
             byte value = bytes[0];
@@ -207,13 +358,14 @@ namespace CountEmblems
             {
                 try
                 {
-                    if (emblemLabel.IsHandleCreated == true)
-                    {
-                        emblemLabel.BeginInvoke(new MethodInvoker(delegate
-                        {
-                            emblemLabel.Text = total.ToString();
-                        }));
-                    }
+                    //if (emblemLabel.IsHandleCreated == true)
+                    //{
+                    //    emblemLabel.BeginInvoke(new MethodInvoker(delegate
+                    //    {
+                    //        emblemLabel.Text = total.ToString();
+                    //    }));
+                    //}
+                    textToShow = total.ToString();
 
                     if (outputName != null && outputName != "")
                     {
@@ -233,7 +385,8 @@ namespace CountEmblems
                 }
             }
         }
-        static Form MakeForm(Size size, Color backcolor, string windowTitle)
+
+        static Form MakeForm(System.Drawing.Size size, System.Drawing.Color backcolor, string windowTitle)
         {
             Form form = new Form();
             form.ClientSize = size;
@@ -242,7 +395,8 @@ namespace CountEmblems
             form.StartPosition = FormStartPosition.CenterScreen;
             form.BackColor = backcolor;
             form.Text = windowTitle;
-            form.Icon = new Icon("icon.ico");
+            //removed icon atm because i'm too lazy to do an other one lol
+            //form.Icon = new Icon("icon.ico");
             form.ShowIcon = true;
             return form;
         }
@@ -289,7 +443,7 @@ namespace CountEmblems
             if ((file1byte - file2byte) != 0)
             {
                 //MessageBox.Show("There are unsaved changes. Do you want to save?");
-                DialogResult result = MessageBox.Show("There are unsaved changes. Do you want to save?", "Unsaved changes", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Information);
+                DialogResult result = System.Windows.Forms.MessageBox.Show("There are unsaved changes. Do you want to save?", "Unsaved changes", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Information);
                 switch (result)
                 {
                     case DialogResult.Yes:
@@ -383,6 +537,16 @@ namespace CountEmblems
                 int fB = fontColor.B;
                 string fontColorS = fA + "," + fR + "," + fG + "," + fB;
 
+                int fA2 = fontColor2.A;
+                int fR2 = fontColor2.R;
+                int fG2 = fontColor2.G;
+                int fB2 = fontColor2.B;
+                string fontColorS2 = fA2 + "," + fR2 + "," + fG2 + "," + fB2;
+
+                int gradient = (int)currentGradientOption;
+                int angle = customAngle;
+                string gradientS = gradient + "," + angle;
+
                 int bA = backColor.A;
                 int bR = backColor.R;
                 int bG = backColor.G;
@@ -393,13 +557,25 @@ namespace CountEmblems
                 int height = windowHeight;
                 string size = width + "," + height;
 
+                string location = textLocation.X + "," + textLocation.Y;
+
+                int i;
+                List<string> outlinesContent = new List<string>();
+                //This next line is for the load file to know how many outlines there are to load
+                outlinesContent.Add(outlines.Count.ToString());
+                for (i = 0; i < outlines.Count; i++)
+                {
+                    outlinesContent.Add(outlines[i].Color.A + "," + outlines[i].Color.R + "," + outlines[i].Color.G + "," + outlines[i].Color.B + "," + outlines[i].Thickness);
+                }
+
                 FontConverter fc = new FontConverter();
-                string[] contents = { fileName, outputName, fontColorS, backColorS, fc.ConvertToString(currentFont), size };
+                string[] contents = { fileName, outputName, fontColorS, fontColorS2, gradientS, backColorS, fc.ConvertToString(currentFont), size, location };
                 File.WriteAllLines(file, contents);
+                File.AppendAllLines(file, outlinesContent.ToArray());
             }
             catch
             {
-                MessageBox.Show("Couldn't save the layout file");
+                System.Windows.Forms.MessageBox.Show("Couldn't save the layout file");
             }
         }
         static void MenuLoad_L(object sender, EventArgs e)
@@ -418,6 +594,13 @@ namespace CountEmblems
                     }
                 }
             }
+            System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
+            timer.Tick += (o, ea) => { UpdateText(); timer.Stop(); };
+            timer.Interval = 100;
+            timer.Start();
+
+            updateGradientSettings();
+            updateLocationSettings();
         }
         static void LoadFile(string file)
         {
@@ -425,8 +608,8 @@ namespace CountEmblems
             {
                 string[] contents = File.ReadAllLines(file);
                 fileName = contents[0];
-                outputName = contents[1];
                 gamedataBox.Text = fileName;
+                outputName = contents[1];
                 outputBox.Text = outputName;
 
                 string[] fColor = contents[2].Split(',');
@@ -434,39 +617,94 @@ namespace CountEmblems
                 int fR = Int32.Parse(fColor[1]);
                 int fG = Int32.Parse(fColor[2]);
                 int fB = Int32.Parse(fColor[3]);
-                fontColor = Color.FromArgb(fA, fR, fG, fB);
+                fontColor = System.Drawing.Color.FromArgb(fA, fR, fG, fB);
 
-                string[] bColor = contents[3].Split(',');
+                string[] fColor2 = contents[3].Split(',');
+                int fA2 = Int32.Parse(fColor2[0]);
+                int fR2 = Int32.Parse(fColor2[1]);
+                int fG2 = Int32.Parse(fColor2[2]);
+                int fB2 = Int32.Parse(fColor2[3]);
+                fontColor2 = System.Drawing.Color.FromArgb(fA2, fR2, fG2, fB2);
+
+                string[] gradientS = contents[4].Split(',');
+                currentGradientOption = (GradientOption)Int32.Parse(gradientS[0]);
+                customAngle = Int32.Parse(gradientS[1]);
+
+                string[] bColor = contents[5].Split(',');
                 int bA = Int32.Parse(bColor[0]);
                 int bR = Int32.Parse(bColor[1]);
                 int bG = Int32.Parse(bColor[2]);
                 int bB = Int32.Parse(bColor[3]);
-                backColor = Color.FromArgb(bA, bR, bG, bB);
+                backColor = System.Drawing.Color.FromArgb(bA, bR, bG, bB);
 
                 FontConverter fc = new FontConverter();
-                currentFont = fc.ConvertFromString(contents[4]) as Font;
+                currentFont = fc.ConvertFromString(contents[6]) as Font;
 
-                string[] size = contents[5].Split(',');
+                string[] size = contents[7].Split(',');
                 windowWidth = Int32.Parse(size[0]);
                 windowHeight = Int32.Parse(size[1]);
+                textXUpDown.Maximum = windowWidth;
+                textYUpDown.Maximum = windowHeight;
+
+                string[] location = contents[8].Split(',');
+                int X = Int32.Parse(location[0]);
+                int Y = Int32.Parse(location[1]);
+                textLocation = new System.Drawing.Point(X, Y);
+                textXUpDown.Value = X;
+                textYUpDown.Value = Y;
+
+                outlines.Clear();
+                int linenumber = 10;
+                int outlinesCount = Int32.Parse(contents[9]);
+                if (outlinesCount != 0)
+                {
+                    int i;
+                    for (i = 0; i < outlinesCount; i++, linenumber++)
+                    {
+                        string[] outline = contents[linenumber].Split(',');
+                        int A = Int32.Parse(outline[0]);
+                        int R = Int32.Parse(outline[1]);
+                        int G = Int32.Parse(outline[2]);
+                        int B = Int32.Parse(outline[3]);
+                        System.Drawing.Color color = System.Drawing.Color.FromArgb(A, R, G, B);
+                        int thickness = Int32.Parse(outline[4]);
+                        outlines.Add(new Outline { Color = color, Thickness = thickness });
+                    }
+                }
             }
             catch
             {
-                MessageBox.Show("Couldn't load the layout file");
+                textXUpDown.Value = 30;
+                textYUpDown.Value = 30;
+                System.Windows.Forms.MessageBox.Show("Couldn't load the layout file");
             }
+            //UpdateText();
         }
+
         static void MenuEdit_L(object sender, EventArgs e)
         {
             previousFontColor = fontColor;
+            previousFontColor2 = fontColor2;
+            previousGradientOption = currentGradientOption;
+            previousCustomAngle = customAngle;
             button2FontColor.BackColor = fontColor;
             previousBackColor = backColor;
             button2BackgroundColor.BackColor = backColor;
             previousFont = currentFont;
+            previousOutlines = new List<Outline>();
+            previousTextLocation = textLocation;
+            foreach (Outline outline in outlines)
+            {
+                previousOutlines.Add(new Outline { Color = outline.Color, Thickness = outline.Thickness });
+            }
+            resetOutlineMenu();
+            updateGradientSettings();
+            updateLocationSettings();
             EditForm.ShowDialog();
         }
-        static void AddConstantLabel(string text, Point location, Form form)
+        static void AddConstantLabel(string text, System.Drawing.Point location, Form form)
         {
-            Label label = new Label();
+            System.Windows.Forms.Label label = new System.Windows.Forms.Label();
             label.Text = text;
             label.Location = location;
             label.AutoSize = true;
@@ -476,7 +714,7 @@ namespace CountEmblems
         {
             using (OpenFileDialog openFileDialog2 = new OpenFileDialog())
             {
-                openFileDialog2.Filter = "dat files (*.dat)|*.dat;";
+                openFileDialog2.Filter = "Dat files (*.dat)|*.dat";
                 openFileDialog2.RestoreDirectory = true;
                 openFileDialog2.ShowDialog();
 
@@ -508,33 +746,42 @@ namespace CountEmblems
         {
             fileName = gamedataBox.Text;
             outputName = outputBox.Text;
-            Console.WriteLine("Gamedata : " + fileName);
-            Console.WriteLine("Output : " + outputName);
         }
         static void CancelIO(object sender, EventArgs e)
         {
             fileName = previousFileName;
             outputName = previousOutputName;
             Console.WriteLine("Gamedata : " + fileName);
-            Console.WriteLine("Output : " + outputName);
         }
-
-        static void fontColorDialog(object sender, EventArgs e)
+        enum fontColorId
+        {
+            FontColor1,
+            FontColor2,
+            Background,
+            Outline
+        }
+        static void fontColorDialog(fontColorId colorId, System.Drawing.Color startColor)
         {
             ColorDialog colorDialog1 = new ColorDialog();
-            colorDialog1.Color = emblemLabel.ForeColor;
+            colorDialog1.Color = startColor;
             if (colorDialog1.ShowDialog() == DialogResult.OK)
             {
-                fontColor = colorDialog1.Color;
-            }
-        }
-        static void backgroundColorDialog(object sender, EventArgs e)
-        {
-            ColorDialog colorDialog2 = new ColorDialog();
-            colorDialog2.Color = MainForm.BackColor;
-            if (colorDialog2.ShowDialog() == DialogResult.OK)
-            {
-                backColor = colorDialog2.Color;
+                switch (colorId)
+                {
+                    case fontColorId.FontColor1:
+                        fontColor = colorDialog1.Color;
+                        break;
+                    case fontColorId.FontColor2:
+                        fontColor2 = colorDialog1.Color;
+                        break;
+                    case fontColorId.Background:
+                        backColor = colorDialog1.Color;
+                        break;
+                    case fontColorId.Outline:
+                        outlineColor = colorDialog1.Color;
+                        UpdateText();
+                        break;
+                }
             }
         }
         static void fontDialog(object sender, EventArgs e)
@@ -552,13 +799,23 @@ namespace CountEmblems
         static void CancelEdit(object sender, EventArgs e)
         {
             fontColor = previousFontColor;
+            fontColor2 = previousFontColor2;
+            currentGradientOption = previousGradientOption;
+            customAngle = previousCustomAngle;
             backColor = previousBackColor;
             currentFont = previousFont;
+            textLocation = previousTextLocation;
+            outlines.Clear();
+            foreach (Outline outline in previousOutlines)
+            {
+                outlines.Add(new Outline { Color = outline.Color, Thickness = outline.Thickness });
+            }
+            UpdateText();
         }
 
-        static Button MakeButton(string text, Point location, EventHandler eventHandler, Form form)
+        static System.Windows.Forms.Button MakeButton(string text, System.Drawing.Point location, EventHandler eventHandler, Form form)
         {
-            Button button = new Button();
+            System.Windows.Forms.Button button = new System.Windows.Forms.Button();
             button.Text = text;
             button.Location = location;
             button.Click += eventHandler;
@@ -569,27 +826,288 @@ namespace CountEmblems
         {
             windowHeight = MainForm.Height;
             windowWidth = MainForm.Width;
+            //MainForm.BackColor = backColor;
+            textXUpDown.Maximum = windowWidth;
+            textYUpDown.Maximum = windowHeight;
+        }
+        static void UpdateText()
+        {
+
+            if (renderBox == null || !renderBox.IsHandleCreated)
+            {
+                return;
+            }
+
+            renderBox.BringToFront();
+
+            Graphics formGraphics = renderBox.CreateGraphics();
+            formGraphics.Clear(backColor);
+
+            using (System.Drawing.Drawing2D.GraphicsPath path = new System.Drawing.Drawing2D.GraphicsPath())
+            {
+                if (currentFont != null)
+                {
+                    path.AddString(
+                        textToShow,
+                        currentFont.FontFamily,
+                        (int)currentFont.Style,
+                        formGraphics.DpiY * currentFont.Size / 72f,
+                        textLocation,
+                        StringFormat.GenericDefault);
+                    rectangle = path.GetBounds();
+
+                    //if(rectangleB != null)
+                    //{
+                    //    rectangleB.BeginInvoke(new MethodInvoker(delegate
+                    //    {
+                    //        rectangleB.Location = Rectangle.Round(rectangle).Location;
+                    //        rectangleB.Size = Rectangle.Round(rectangle).Size;
+                    //    }));
+                    //}
+
+                    formGraphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                    formGraphics.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
+                    formGraphics.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceOver;
+                    System.Drawing.Drawing2D.LinearGradientBrush fillBrush;
+
+                    switch (currentGradientOption)
+                    {
+                        case GradientOption.None:
+                        default:
+                            fillBrush = new System.Drawing.Drawing2D.LinearGradientBrush(
+                                new System.Drawing.Point((int)rectangle.Left, 0),
+                                new System.Drawing.Point((int)rectangle.Right, 0),
+                                fontColor,
+                                fontColor);
+                            break;
+                        case GradientOption.Horizontal:
+                            fillBrush = new System.Drawing.Drawing2D.LinearGradientBrush(
+                                new System.Drawing.Point((int)rectangle.Left, 0),
+                                new System.Drawing.Point((int)rectangle.Right, 0),
+                                fontColor,
+                                fontColor2);
+                            break;
+                        case GradientOption.Vertical:
+                            fillBrush = new System.Drawing.Drawing2D.LinearGradientBrush(
+                                new System.Drawing.Point(0, (int)rectangle.Top),
+                                new System.Drawing.Point(0, (int)rectangle.Bottom),
+                                fontColor,
+                                fontColor2);
+                            break;
+                        case GradientOption.Custom:
+                            // just a temp brush
+                            fillBrush = new System.Drawing.Drawing2D.LinearGradientBrush(
+                                rectangle,
+                                fontColor,
+                                fontColor2,
+                                customAngle);
+                            break;
+                    }
+
+
+
+                    for (int i = outlines.Count - 1; i >= 0; i--)
+                    {
+                        int totalThickness = 0;
+                        for (int j = i; j >= 0; j--)
+                        {
+                            totalThickness += outlines[j].Thickness;
+                        }
+                        formGraphics.DrawPath(new System.Drawing.Pen(outlines[i].Color, totalThickness), path);
+                    }
+                    formGraphics.FillPath(fillBrush, path);
+                    fillBrush.Dispose();
+                }
+            }
+            formGraphics.Dispose();
+
+        }
+        static void updateRemoveButton()
+        {
+            if (outlines.Count <= 0)
+            {
+                removeOutlineButton.Enabled = false;
+            }
+            else
+            {
+                removeOutlineButton.Enabled = true;
+            }
         }
 
+
+        static void updateOutlineSettings()
+        {
+            updateRemoveButton();
+            thicknessUpDown.Enabled = false;
+            buttonOutlineColor.Enabled = false;
+            if (outlines.Count > 0 && outlineMenu.SelectedIndex >= 0)
+            {
+                thicknessUpDown.Enabled = true;
+                buttonOutlineColor.Enabled = true;
+                outlineColor = outlines[outlineMenu.SelectedIndex].Color;
+                thicknessUpDown.Value = outlines[outlineMenu.SelectedIndex].Thickness;
+            }
+        }
+
+        static void resetOutlineMenu()
+        {
+            outlineMenu.Items.Clear();
+            if (outlines.Count > 0)
+            {
+                // This function is just for the visual menu
+                for (int i = 0; i < outlines.Count; i++)
+                {
+                    outlineMenu.Items.Add("Outline " + (i + 1));
+                }
+                outlineMenu.SelectedIndex = 0;
+            }
+            updateOutlineSettings();
+        }
+        static void updateOutlineMenu()
+        {
+            if (outlines.Count > 0)
+            {
+                // This function is just for the visual menu
+                for (int i = 0; i < outlineMenu.Items.Count; i++)
+                {
+                    outlineMenu.Items[i] = "Outline " + (i + 1);
+                }
+            }
+            updateOutlineSettings();
+        }
+        static void updateLocationSettings()
+        {
+            if (textXUpDown != null && textYUpDown != null)
+            {
+                int x = textLocation.X;
+                int y = textLocation.Y;
+                textXUpDown.Value = x;
+                textYUpDown.Value = y;
+            }
+        }
+        static void newOutline(object sender, EventArgs e)
+        {
+            outlines.Add(new Outline { Thickness = defaultOutline.Thickness, Color = defaultOutline.Color });
+            outlineMenu.Items.Add("Outline " + outlineCount);
+            outlineMenu.SelectedIndex = outlines.Count - 1;
+            updateOutlineMenu();
+        }
+        static void delOutline(object sender, EventArgs e)
+        {
+            if (outlineMenu.SelectedIndex > 1)
+            {
+                previousIndex = outlineMenu.SelectedIndex - 1;
+            }
+            else
+            {
+                previousIndex = 0;
+            }
+            outlines.RemoveAt(outlineMenu.SelectedIndex);
+            outlineMenu.Items.RemoveAt(outlineMenu.SelectedIndex);
+            if (outlines.Count > 0)
+            {
+                outlineMenu.SelectedIndex = previousIndex;
+            }
+            updateOutlineMenu();
+        }
+        static void thicknessChanged(object sender, EventArgs e)
+        {
+            outlineThickness = (int)thicknessUpDown.Value;
+            UpdateText();
+        }
+        static void angleChanged(object sender, EventArgs e)
+        {
+            customAngle = (int)angleUpDown.Value;
+        }
+        static void LocationChanged()
+        {
+            textLocation = new System.Drawing.Point((int)textXUpDown.Value, (int)textYUpDown.Value);
+            //rectangleB.Location = new System.Drawing.Point((int)textXUpDown.Value, (int)textYUpDown.Value);
+        }
+        static void updateGradientSettings()
+        {
+            currentGradientOption = (GradientOption)gradientMenu.SelectedIndex;
+            buttonFontColor2.Enabled = false;
+            angleUpDown.Enabled = false;
+            if (currentGradientOption != GradientOption.None)
+            {
+                buttonFontColor2.Enabled = true;
+            }
+            if (currentGradientOption == GradientOption.Custom)
+            {
+                angleUpDown.Enabled = true;
+            }
+            UpdateText();
+        }
+        static bool movingStarted = false;
+        static System.Drawing.Point startDelta;
+        static void OnMouseDown(object sender, System.Windows.Forms.MouseEventArgs e)
+        {
+            int cursorX = MainForm.PointToClient(Cursor.Position).X;
+            int cursorY = MainForm.PointToClient(Cursor.Position).Y;
+            if (e.Button == MouseButtons.Left && cursorX >= rectangle.Left && cursorX <= rectangle.Right && cursorY >= rectangle.Top && cursorY <= rectangle.Bottom)
+            {
+                if (MainForm.ContextMenuStrip != null)
+                {
+                    if (MainForm.ContextMenuStrip.Visible)
+                    {
+                        movingStarted = false;
+                    }
+                }
+                else if (MainForm.Focused)
+                {
+                    movingStarted = true;
+                }
+                startDelta = new System.Drawing.Point(
+                    MainForm.PointToClient(Cursor.Position).X - textLocation.X,
+                    MainForm.PointToClient(Cursor.Position).Y - textLocation.Y);
+            }
+        }
+        static void OnMouseMove(object sender, System.Windows.Forms.MouseEventArgs e)
+        {
+            if (movingStarted)
+            {
+                rectangleB.Location = new System.Drawing.Point(
+                    MainForm.PointToClient(Cursor.Position).X - startDelta.X,
+                    MainForm.PointToClient(Cursor.Position).Y - startDelta.Y);
+                int x = Clamp(rectangleB.Location.X, (int)textXUpDown.Minimum, (int)textXUpDown.Maximum - 64);
+                int y = Clamp(rectangleB.Location.Y, (int)textYUpDown.Minimum, (int)textYUpDown.Maximum - 64);
+                textLocation = new System.Drawing.Point(x, y);
+                //rectangleB.Location = textLocation;
+                movingStarted = true;
+            }
+        }
+        static void OnMouseUp(object sender, System.Windows.Forms.MouseEventArgs e)
+        {
+            movingStarted = false;
+        }
+        static int Clamp(int value, int minValue, int maxValue)
+        {
+            if (value > maxValue)
+            {
+                value = maxValue;
+            }
+            if (value < minValue)
+            {
+                value = minValue;
+            }
+            return value;
+        }
         [STAThread]
         static void Main()
         {
-            MainForm = MakeForm(new Size(250, 200), Color.FromArgb(0, 0, 0), "SRB2 Emblem Display");
+            MainForm = MakeForm(new System.Drawing.Size(250, 200), System.Drawing.Color.FromArgb(0, 0, 0), "Text File Display");
             windowWidth = 250;
             windowHeight = 200;
             MainForm.FormBorderStyle = FormBorderStyle.Sizable;
             MainForm.SizeGripStyle = SizeGripStyle.Hide;
-            IOForm = MakeForm(new Size(295, 175), Color.FromArgb(240, 240, 240), "I/O Options");
-            EditForm = MakeForm(new Size(245, 155), Color.FromArgb(240, 240, 240), "Edit Layout");
+            IOForm = MakeForm(new System.Drawing.Size(295, 175), System.Drawing.Color.FromArgb(240, 240, 240), "I/O Options");
+            EditForm = MakeForm(new System.Drawing.Size(245, 350), System.Drawing.Color.FromArgb(240, 240, 240), "Edit Layout");
             MainForm.FormClosing += FormExit;
             MainForm.ResizeEnd += ResizeEnd;
 
-            emblemLabel = new Label();
-            emblemLabel.Text = "No text\nto display";
-            emblemLabel.Location = new Point(10, 10);
-            emblemLabel.AutoSize = true;
-            emblemLabel.ForeColor = Color.FromArgb(255, 255, 255);
-            currentFont = new Font("Arial", 20, FontStyle.Bold, GraphicsUnit.Point);
+            textToShow = "No text\nto display";
+            currentFont = new Font("Arial", 20, System.Drawing.FontStyle.Bold, GraphicsUnit.Point);
 
             EventHandler exitHandler = new EventHandler(MenuExit);
             EventHandler IO_Options = new EventHandler(MenuIO_Options);
@@ -604,15 +1122,19 @@ namespace CountEmblems
             EventHandler OkIOHandler = new EventHandler(OkIO);
             EventHandler CancelIOHandler = new EventHandler(CancelIO);
 
-            EventHandler fontColorHandler = new EventHandler(fontColorDialog);
-            EventHandler backgroundColorHandler = new EventHandler(backgroundColorDialog);
             EventHandler fontHandler = new EventHandler(fontDialog);
+
+            EventHandler newOutlineHandler = new EventHandler(newOutline);
+            EventHandler delOutlineHandler = new EventHandler(delOutline);
+            EventHandler thicknessChangedHandler = new EventHandler(thicknessChanged);
+
+            EventHandler angleChangedHandler = new EventHandler(angleChanged);
 
             EventHandler OkEditHandler = new EventHandler(OkEdit);
             EventHandler CancelEditHandler = new EventHandler(CancelEdit);
 
-            ContextMenu menu = new ContextMenu();
-            menu.MenuItems.Add("Input/Output options", IO_Options);
+            System.Windows.Forms.ContextMenu menu = new System.Windows.Forms.ContextMenu();
+            menu.MenuItems.Add("Text Input file", IO_Options);
             menu.MenuItems.Add("-");
             menu.MenuItems.Add("Save layout", Save_L);
             menu.MenuItems.Add("Save layout as...", SaveAs_L);
@@ -628,8 +1150,6 @@ namespace CountEmblems
             {
                 // We want to change the number in the output file on the first loop
                 previousTotal = NO_PREVIOUS_TOTAL;
-                Console.WriteLine("Game data file: " + fileName);
-                Console.WriteLine("Output file: " + outputName);
                 while (true)
                 {
                     Analyze_file(fileName, outputName);
@@ -637,68 +1157,180 @@ namespace CountEmblems
                 }
             }).Start();
 
-            AddConstantLabel("Game data's path:", new Point(10, 10), IOForm);
-            gamedataBox = new TextBox();
+            AddConstantLabel("Input path:", new System.Drawing.Point(10, 10), IOForm);
+            gamedataBox = new System.Windows.Forms.TextBox();
             gamedataBox.Text = fileName;
-            gamedataBox.Location = new Point(10, 30);
-            gamedataBox.Size = new Size(180, 20);
+            gamedataBox.Location = new System.Drawing.Point(10, 30);
+            gamedataBox.Size = new System.Drawing.Size(180, 20);
             IOForm.Controls.Add(gamedataBox);
-            Button gamedataButton = MakeButton("Browse", new Point(200, 30), gamedataButtonHandler, IOForm);
+            System.Windows.Forms.Button gamedataButton = MakeButton("Browse", new System.Drawing.Point(200, 30), gamedataButtonHandler, IOForm);
 
-            AddConstantLabel("Output file's path:", new Point(10, 60), IOForm);
+            AddConstantLabel("Output file's path:", new System.Drawing.Point(10, 60), IOForm);
             outputBox = new TextBox();
             outputBox.Text = outputName;
-            outputBox.Location = new Point(10, 80);
-            outputBox.Size = new Size(180, 20);
+            outputBox.Location = new System.Drawing.Point(10, 80);
+            outputBox.Size = new System.Drawing.Size(180, 20);
             IOForm.Controls.Add(outputBox);
-            Button outputButton = MakeButton("Browse", new Point(200, 80), outputButtonHandler, IOForm);
+            Button outputButton = MakeButton("Browse", new System.Drawing.Point(200, 80), outputButtonHandler, IOForm);
 
-            Button buttonOkIO = MakeButton("OK", new Point(110, 140), OkIOHandler, IOForm);
+            System.Windows.Forms.Button buttonOkIO = MakeButton("OK", new System.Drawing.Point(110, 140), OkIOHandler, IOForm);
             buttonOkIO.DialogResult = DialogResult.OK;
             IOForm.AcceptButton = buttonOkIO;
 
-            Button buttonCancelIO = MakeButton("Cancel", new Point(200, 140), CancelIOHandler, IOForm);
+            System.Windows.Forms.Button buttonCancelIO = MakeButton("Cancel", new System.Drawing.Point(200, 140), CancelIOHandler, IOForm);
             buttonCancelIO.DialogResult = DialogResult.Cancel;
             IOForm.CancelButton = buttonCancelIO;
 
-            AddConstantLabel("Font color : ", new Point(10, 15), EditForm);
-            AddConstantLabel("Background color :  ", new Point(10, 35), EditForm);
-            AddConstantLabel("Font : ", new Point(10, 55), EditForm);
+            AddConstantLabel("Font color : ", new System.Drawing.Point(10, 15), EditForm);
+            AddConstantLabel("Background color :  ", new System.Drawing.Point(10, 35), EditForm);
+            AddConstantLabel("Font : ", new System.Drawing.Point(10, 55), EditForm);
 
-            Button buttonFontColor = MakeButton("...", new Point(155, 10), fontColorHandler, EditForm);
+            System.Windows.Forms.Button buttonFontColor = MakeButton("...", new System.Drawing.Point(155, 10), (o, e) => { fontColorDialog(fontColorId.FontColor1, fontColor); }, EditForm);
 
-            button2FontColor = new Button();
+            button2FontColor = new System.Windows.Forms.Button();
             button2FontColor.Text = "";
-            button2FontColor.Location = new Point(130, 10);
-            button2FontColor.Size = new Size(23, 23);
+            button2FontColor.Location = new System.Drawing.Point(130, 10);
+            button2FontColor.Size = new System.Drawing.Size(23, 23);
             button2FontColor.Enabled = false;
             EditForm.Controls.Add(button2FontColor);
 
-            Button buttonBackgroundColor = MakeButton("...", new Point(155, 30), backgroundColorHandler, EditForm);
+            System.Windows.Forms.Button buttonBackgroundColor = MakeButton("...", new System.Drawing.Point(155, 30), (o, e) => { fontColorDialog(fontColorId.Background, backColor); }, EditForm);
 
-            button2BackgroundColor = new Button();
+            button2BackgroundColor = new System.Windows.Forms.Button();
             button2BackgroundColor.Text = "";
-            button2BackgroundColor.Location = new Point(130, 30);
-            button2BackgroundColor.Size = new Size(23, 23);
+            button2BackgroundColor.Location = new System.Drawing.Point(130, 30);
+            button2BackgroundColor.Size = new System.Drawing.Size(23, 23);
             button2BackgroundColor.Enabled = false;
             EditForm.Controls.Add(button2BackgroundColor);
 
-            Button buttonFont = MakeButton("...", new Point(155, 50), fontHandler, EditForm);
+            System.Windows.Forms.Button buttonFont = MakeButton("...", new System.Drawing.Point(155, 50), fontHandler, EditForm);
 
-            Button buttonOkEdit = MakeButton("Ok", new Point(65, 120), OkEditHandler, EditForm);
+            backColor = MainForm.BackColor;
+
+            AddConstantLabel("Outlines:", new System.Drawing.Point(10, 95), EditForm);
+            addOutlineButton = MakeButton("Add", new System.Drawing.Point(10, 110), newOutlineHandler, EditForm);
+            addOutlineButton.Size = new System.Drawing.Size(40, 23);
+            removeOutlineButton = MakeButton("Rem", new System.Drawing.Point(55, 110), delOutlineHandler, EditForm);
+            removeOutlineButton.Size = new System.Drawing.Size(40, 23);
+            updateRemoveButton();
+
+            outlineMenu = new ComboBox();
+            outlineMenu.Location = new System.Drawing.Point(10, 140);
+            outlineMenu.Size = new System.Drawing.Size(87, 22);
+            outlineMenu.DropDownStyle = ComboBoxStyle.DropDownList;
+            EditForm.Controls.Add(outlineMenu);
+            outlineMenu.SelectedValueChanged += (o, e) => { updateOutlineSettings(); };
+
+            AddConstantLabel("Color:", new System.Drawing.Point(130, 115), EditForm);
+            buttonOutlineColor = MakeButton("...", new System.Drawing.Point(194, 110), (o, e) => { fontColorDialog(fontColorId.Outline, outlineColor); }, EditForm);
+            buttonOutlineColor.Enabled = false;
+            buttonOutlineColor.Size = new System.Drawing.Size(35, 23);
+            button2OutlineColor = new System.Windows.Forms.Button();
+            button2OutlineColor.Text = "";
+            button2OutlineColor.Location = new System.Drawing.Point(169, 110);
+            button2OutlineColor.Size = new System.Drawing.Size(23, 23);
+            button2OutlineColor.Enabled = false;
+            EditForm.Controls.Add(button2OutlineColor);
+
+            AddConstantLabel("Thickness:", new System.Drawing.Point(130, 143), EditForm);
+            thicknessUpDown = new NumericUpDown();
+            thicknessUpDown.Location = new System.Drawing.Point(190, 140);
+            thicknessUpDown.Size = new System.Drawing.Size(40, 0);
+            thicknessUpDown.ValueChanged += thicknessChangedHandler;
+            thicknessUpDown.Enabled = false;
+            EditForm.Controls.Add(thicknessUpDown);
+
+            Label separator = new Label();
+            separator.Location = new System.Drawing.Point(115, 90);
+            separator.Width = 2;
+            separator.Size = new System.Drawing.Size(1, 77);
+            separator.BorderStyle = BorderStyle.Fixed3D;
+            EditForm.Controls.Add(separator);
+            separator.Enabled = false;
+            Label separator2 = new Label();
+            separator2.Location = new System.Drawing.Point(10, 167);
+            separator2.Height = 2;
+            separator2.Size = new System.Drawing.Size(220, 1);
+            separator2.BorderStyle = BorderStyle.Fixed3D;
+            EditForm.Controls.Add(separator2);
+            separator2.Enabled = false;
+            Label separator3 = new Label();
+            separator3.Location = new System.Drawing.Point(10, 90);
+            separator3.Height = 2;
+            separator3.Size = new System.Drawing.Size(220, 1);
+            separator3.BorderStyle = BorderStyle.Fixed3D;
+            EditForm.Controls.Add(separator3);
+            separator3.Enabled = false;
+
+            AddConstantLabel("Font fill gradient", new System.Drawing.Point(10, 183), EditForm);
+            gradientMenu = new ComboBox();
+            gradientMenu.DropDownStyle = ComboBoxStyle.DropDownList;
+            gradientMenu.Items.Insert((int)GradientOption.None, "None");
+            gradientMenu.Items.Insert((int)GradientOption.Horizontal, "Horizontal");
+            gradientMenu.Items.Insert((int)GradientOption.Vertical, "Vertical");
+            gradientMenu.Items.Insert((int)GradientOption.Custom, "Custom");
+            gradientMenu.Location = new System.Drawing.Point(110, 180);
+            gradientMenu.SelectedIndex = (int)GradientOption.None;
+            gradientMenu.SelectedValueChanged += (o, e) => { updateGradientSettings(); };
+            EditForm.Controls.Add(gradientMenu);
+
+            buttonFontColor2 = MakeButton("...", new System.Drawing.Point(155, 205), (o, e) => { fontColorDialog(fontColorId.FontColor2, fontColor2); }, EditForm);
+            AddConstantLabel("Gradient End Color:", new System.Drawing.Point(10, 210), EditForm);
+            button2FontColor2 = MakeButton("", new System.Drawing.Point(130, 205), null, EditForm);
+            button2FontColor2.Size = new System.Drawing.Size(23, 23);
+            button2FontColor2.Enabled = false;
+
+            AddConstantLabel("Custom Angle:", new System.Drawing.Point(110, 238), EditForm);
+            angleUpDown = new NumericUpDown();
+            angleUpDown.Location = new System.Drawing.Point(190, 235);
+            angleUpDown.Size = new System.Drawing.Size(40, 0);
+            angleUpDown.ValueChanged += angleChangedHandler;
+            angleUpDown.Enabled = false;
+            EditForm.Controls.Add(angleUpDown);
+
+            AddConstantLabel("Text location:", new System.Drawing.Point(10, 265), EditForm);
+            AddConstantLabel("X:", new System.Drawing.Point(10, 288), EditForm);
+            textXUpDown = new NumericUpDown();
+            textXUpDown.Location = new System.Drawing.Point(30, 285);
+            textXUpDown.Size = new System.Drawing.Size(70, 0);
+            textXUpDown.ValueChanged += (o, e) => { LocationChanged(); };
+            EditForm.Controls.Add(textXUpDown);
+            AddConstantLabel("Y:", new System.Drawing.Point(110, 288), EditForm);
+            textYUpDown = new NumericUpDown();
+            textYUpDown.Location = new System.Drawing.Point(130, 285);
+            textYUpDown.Size = new System.Drawing.Size(70, 0);
+            textYUpDown.ValueChanged += (o, e) => { LocationChanged(); };
+            EditForm.Controls.Add(textYUpDown);
+            textXUpDown.Maximum = windowWidth;
+            textYUpDown.Maximum = windowHeight;
+
+            System.Windows.Forms.Button buttonOkEdit = MakeButton("Ok", new System.Drawing.Point(65, EditForm.Height - 65), OkEditHandler, EditForm);
             buttonOkEdit.DialogResult = DialogResult.OK;
             EditForm.AcceptButton = buttonOkEdit;
 
-            Button buttonCancelEdit = MakeButton("Cancel", new Point(155, 120), CancelEditHandler, EditForm);
+            System.Windows.Forms.Button buttonCancelEdit = MakeButton("Cancel", new System.Drawing.Point(155, EditForm.Height - 65), CancelEditHandler, EditForm);
             buttonCancelEdit.DialogResult = DialogResult.Cancel;
             EditForm.CancelButton = buttonCancelEdit;
 
-            backColor = MainForm.BackColor;
-            fontColor = emblemLabel.ForeColor;
+
+            // Just some default values before loading
+            fontColor = System.Drawing.Color.White;
+            fontColor2 = System.Drawing.Color.White;
 
             Thread.CurrentThread.IsBackground = true;
-            MainForm.Controls.Add(emblemLabel);
+            //MainForm.Controls.Add(emblemLabel);
 
+            rectangleB = new PictureBox();
+            rectangleB.Location = new System.Drawing.Point(textLocation.X, textLocation.Y);
+            rectangleB.Size = Rectangle.Round(rectangle).Size;
+            //rectangleB.MouseMove += OnMouseMove;
+            MainForm.Controls.Add(rectangleB);
+
+            renderBox = new PictureBox();
+            renderBox.Size = new System.Drawing.Size(9001, 9001);
+            renderBox.MouseDown += OnMouseDown;
+            renderBox.MouseMove += OnMouseMove;
+            renderBox.MouseUp += OnMouseUp;
             if (File.Exists(PREVIOUS_INI_NAME))
             {
                 string previousFile = File.ReadAllText(PREVIOUS_INI_NAME);
@@ -708,8 +1340,16 @@ namespace CountEmblems
             {
                 File.Create(PREVIOUS_INI_NAME).Close();
             }
-
+            MainForm.SizeChanged += (o, e) => { MainFormSizeChanged(); };
+            MainForm.Controls.Add(renderBox);
+            MainForm.Paint += (o, e) => { UpdateText(); };
+            Thread.CurrentThread.IsBackground = true;
             MainForm.ShowDialog();
+        }
+
+        private static void MainFormSizeChanged()
+        {
+            UpdateText();
         }
     }
 }
