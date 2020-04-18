@@ -395,8 +395,12 @@ namespace CountEmblems
             form.StartPosition = FormStartPosition.CenterScreen;
             form.BackColor = backcolor;
             form.Text = windowTitle;
-            form.Icon = new Icon("icon.ico");
-            form.ShowIcon = true;
+            try
+            {
+                form.Icon = new Icon("icon.ico");
+                form.ShowIcon = true;
+            }
+            catch { }
             return form;
         }
         static bool UnsavedChanges()
