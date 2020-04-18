@@ -592,8 +592,8 @@ namespace CountEmblems
                     openFileDialog1.RestoreDirectory = true;
                     if (openFileDialog1.ShowDialog() == DialogResult.OK)
                     {
-                        LoadFile(openFileDialog1.FileName);
                         File.WriteAllText(PREVIOUS_INI_NAME, openFileDialog1.FileName);
+                        LoadFile(openFileDialog1.FileName);
                     }
                 }
             }
@@ -679,6 +679,7 @@ namespace CountEmblems
             {
                 textXUpDown.Value = 30;
                 textYUpDown.Value = 30;
+                File.WriteAllText(PREVIOUS_INI_NAME, "");
                 System.Windows.Forms.MessageBox.Show("Couldn't load the layout file");
             }
             //UpdateText();
