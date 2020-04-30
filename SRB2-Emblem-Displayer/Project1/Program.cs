@@ -489,7 +489,12 @@ namespace CountEmblems
             previousFileName = fileName;
             previousOutputName = outputName;
             Thread.CurrentThread.IsBackground = true;
-            IOForm.ShowDialog();
+            if (IOForm.ShowDialog() == DialogResult.OK)
+            {
+                OkIO(null, null);
+                return;
+            }
+            CancelIO(null, null);
         }
         static void MenuSave()
         {
@@ -704,7 +709,11 @@ namespace CountEmblems
             resetOutlineMenu();
             updateGradientSettings();
             updateLocationSettings();
-            EditForm.ShowDialog();
+            if (EditForm.ShowDialog() == DialogResult.OK)
+            {
+                return;
+            }
+            CancelEdit(null, null);
         }
         static void AddConstantLabel(string text, System.Drawing.Point location, Form form)
         {
