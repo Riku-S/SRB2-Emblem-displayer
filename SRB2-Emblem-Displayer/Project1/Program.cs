@@ -34,6 +34,9 @@ namespace CountEmblems
         const string CURRENT_INI_NAME = "current.ini";
         static string previousFileName;
         static string previousOutputName;
+        static string previousAfterText;
+        static string previousAfterText2;
+        static int previousAfterCheck;
         static Form MainForm;
         static Form IOForm;
         static Form EditForm;
@@ -60,6 +63,11 @@ namespace CountEmblems
         static ComboBox gradientMenu;
         static NumericUpDown textXUpDown;
         static NumericUpDown textYUpDown;
+        static TextBox textAfter;
+        static string textAfterValue = "";
+        static CheckBox textAfterCheck = new CheckBox();
+        static int textAfterChecked;
+        static int previousTextAfterChecked;
         static System.Drawing.Point previousTextLocation;
         static System.Drawing.Point textLocationMember = new System.Drawing.Point(30, 30);
         static System.Drawing.Point textLocation
@@ -354,7 +362,7 @@ namespace CountEmblems
             {
                 total = 0;
             }
-            if (total != previousTotal)
+            if (total != previousTotal || textAfterValue != previousAfterText2 || textAfterChecked != previousAfterCheck)
             {
                 try
                 {
@@ -365,7 +373,14 @@ namespace CountEmblems
                     //        emblemLabel.Text = total.ToString();
                     //    }));
                     //}
-                    textToShow = total.ToString();
+                    if (textAfterChecked == 1)
+                    {
+                        textToShow = total.ToString() + textAfterValue;
+                    }
+                    else
+                    {
+                        textToShow = total.ToString();
+                    }
 
                     if (outputName != null && outputName != "")
                     {
@@ -384,6 +399,8 @@ namespace CountEmblems
                     }
                 }
             }
+            previousAfterCheck = textAfterChecked;
+            previousAfterText2 = textAfterValue;
         }
 
         static Form MakeForm(System.Drawing.Size size, System.Drawing.Color backcolor, string windowTitle)
@@ -577,7 +594,7 @@ namespace CountEmblems
                 }
 
                 FontConverter fc = new FontConverter();
-                string[] contents = { fileName, outputName, fontColorS, fontColorS2, gradientS, backColorS, fc.ConvertToString(currentFont), size, location };
+                string[] contents = { fileName, outputName, fontColorS, fontColorS2, gradientS, backColorS, fc.ConvertToString(currentFont), size, location, textAfterChecked.ToString(), textAfterValue };
                 File.WriteAllLines(file, contents);
                 File.AppendAllLines(file, outlinesContent.ToArray());
             }
@@ -661,9 +678,13 @@ namespace CountEmblems
                 textXUpDown.Value = X;
                 textYUpDown.Value = Y;
 
+                textAfterChecked = Int32.Parse(contents[9]);
+                textAfterValue = contents[10];
+                textAfter.Text = textAfterValue;
+
                 outlines.Clear();
-                int linenumber = 10;
-                int outlinesCount = Int32.Parse(contents[9]);
+                int linenumber = 12;
+                int outlinesCount = Int32.Parse(contents[11]);
                 if (outlinesCount != 0)
                 {
                     int i;
@@ -702,6 +723,20 @@ namespace CountEmblems
             previousFont = currentFont;
             previousOutlines = new List<Outline>();
             previousTextLocation = textLocation;
+            previousAfterText = textAfter.Text;
+            previousTextAfterChecked = textAfterChecked;
+
+            if(textAfterChecked == 1)
+            {
+                textAfterCheck.Checked = true;
+                textAfter.Enabled = true;
+            }
+            else
+            {
+                textAfterCheck.Checked = false;
+                textAfter.Enabled = false;
+            }
+
             foreach (Outline outline in outlines)
             {
                 previousOutlines.Add(new Outline { Color = outline.Color, Thickness = outline.Thickness });
@@ -818,6 +853,9 @@ namespace CountEmblems
             backColor = previousBackColor;
             currentFont = previousFont;
             textLocation = previousTextLocation;
+            textAfter.Text = previousAfterText;
+            textAfterChecked = previousTextAfterChecked;
+
             outlines.Clear();
             foreach (Outline outline in previousOutlines)
             {
@@ -1106,6 +1144,26 @@ namespace CountEmblems
             }
             return value;
         }
+
+        static void textAfterChanged(object sender, EventArgs e)
+        {
+            textAfterValue = textAfter.Text;
+        }
+
+        static void textAfterCheckChanged(object sender, EventArgs e)
+        {
+            if (textAfterCheck.Checked == true)
+            {
+                textAfterChecked = 1;
+                textAfter.Enabled = true;
+            }
+            else
+            {
+                textAfterChecked = 0;
+                textAfter.Enabled = false;
+            }
+        }
+
         [STAThread]
         static void Main()
         {
@@ -1115,7 +1173,7 @@ namespace CountEmblems
             MainForm.FormBorderStyle = FormBorderStyle.Sizable;
             MainForm.SizeGripStyle = SizeGripStyle.Hide;
             IOForm = MakeForm(new System.Drawing.Size(295, 175), System.Drawing.Color.FromArgb(240, 240, 240), "I/O Options");
-            EditForm = MakeForm(new System.Drawing.Size(245, 350), System.Drawing.Color.FromArgb(240, 240, 240), "Edit Layout");
+            EditForm = MakeForm(new System.Drawing.Size(245, 415), System.Drawing.Color.FromArgb(240, 240, 240), "Edit Layout");
             MainForm.FormClosing += FormExit;
             MainForm.ResizeEnd += ResizeEnd;
 
@@ -1146,6 +1204,9 @@ namespace CountEmblems
             EventHandler OkEditHandler = new EventHandler(OkEdit);
             EventHandler CancelEditHandler = new EventHandler(CancelEdit);
 
+            EventHandler textAfterHandler = new EventHandler(textAfterChanged);
+            EventHandler textAfterCheckHandler = new EventHandler(textAfterCheckChanged);
+
             System.Windows.Forms.ContextMenu menu = new System.Windows.Forms.ContextMenu();
             menu.MenuItems.Add("Text Input file", IO_Options);
             menu.MenuItems.Add("-");
@@ -1157,7 +1218,7 @@ namespace CountEmblems
             menu.MenuItems.Add("Exit", exitHandler);
 
             MainForm.ContextMenu = menu;
-
+            textAfter = new TextBox();
             // Take everythig out of this new thread and replace it with things that console application does
             new Thread(() =>
             {
@@ -1316,6 +1377,18 @@ namespace CountEmblems
             EditForm.Controls.Add(textYUpDown);
             textXUpDown.Maximum = windowWidth;
             textYUpDown.Maximum = windowHeight;
+
+            AddConstantLabel("Text after the emblem count:", new System.Drawing.Point(10, 320), EditForm);
+            textAfter.Text = "";
+            previousAfterText2 = textAfter.Text;
+            textAfter.Location = new System.Drawing.Point(10, 340);
+            textAfter.Size = new System.Drawing.Size(220, 20);
+            textAfter.TextChanged += textAfterHandler;
+            EditForm.Controls.Add(textAfter);
+
+            textAfterCheck.Location = new System.Drawing.Point(217, 316);
+            textAfterCheck.CheckedChanged += textAfterCheckHandler;
+            EditForm.Controls.Add(textAfterCheck);
 
             System.Windows.Forms.Button buttonOkEdit = MakeButton("Ok", new System.Drawing.Point(65, EditForm.Height - 65), OkEditHandler, EditForm);
             buttonOkEdit.DialogResult = DialogResult.OK;
