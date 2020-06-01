@@ -8,11 +8,35 @@ using System.Windows;
 using System.Windows.Media;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.ComponentModel;
+using System.Windows.Input;
+using System.Runtime.Remoting.Contexts;
 
 namespace CountEmblems
 {
     class Program
     {
+        static MenuItem menuGlobalHotkeys = new MenuItem();
+        static public bool hotkeysEnabled;
+        static Button resetBindButton = new Button();
+        static Button enableBindButton = new Button();
+        static bool isBindingReset = false;
+        static bool isBindingEnable = false;
+
+        static public bool Reset;
+        static public bool previousReset;
+
+        static KeysConverter kc = new KeysConverter();
+
+        static string ResetKeyCode = "None";
+        static public int ResetKeyValue = 0;
+        static string EnableKeyCode = "None";
+        static public int EnableKeyValue = 0;
+        static string previousResetKeyCode = "None";
+        static int previousResetKeyValue = 0;
+        static string previousEnableKeyCode = "None";
+        static int previousEnableKeyValue = 0;
         class Outline
         {
             public int Thickness;
@@ -40,12 +64,15 @@ namespace CountEmblems
         static Form MainForm;
         static Form IOForm;
         static Form EditForm;
+        static Form KeySetForm;
         //static System.Windows.Forms.Label emblemLabel;
         static System.Windows.Forms.Button button2FontColor;
         static System.Windows.Forms.Button button2FontColor2;
         static System.Windows.Forms.Button button2BackgroundColor;
         static System.Windows.Forms.TextBox gamedataBox;
         static TextBox outputBox;
+        static TextBox resetHotkeyText = new TextBox();
+        static TextBox enableHotkeysText = new TextBox();
         static System.Drawing.Color previousFontColor;
         static System.Drawing.Color previousFontColor2;
         static System.Drawing.Color previousBackColor;
@@ -362,7 +389,24 @@ namespace CountEmblems
             {
                 total = 0;
             }
-            if (total != previousTotal || textAfterValue != previousAfterText2 || textAfterChecked != previousAfterCheck)
+
+            if (Reset == true && (previousReset == false || textAfterValue != previousAfterText2 || textAfterChecked != previousAfterCheck))
+            {
+                if(textAfterChecked == 1)
+                {
+                    textToShow = "0" + textAfterValue;
+                }
+                else
+                {
+                    textToShow = "0";
+                }
+            }
+            if (Reset == true && total != previousTotal)
+            {
+                Reset = false;
+            }
+
+            if ((total != previousTotal || textAfterValue != previousAfterText2 || textAfterChecked != previousAfterCheck) && Reset == false)
             {
                 try
                 {
@@ -401,6 +445,7 @@ namespace CountEmblems
             }
             previousAfterCheck = textAfterChecked;
             previousAfterText2 = textAfterValue;
+            previousReset = Reset;
         }
 
         static Form MakeForm(System.Drawing.Size size, System.Drawing.Color backcolor, string windowTitle)
@@ -486,6 +531,7 @@ namespace CountEmblems
             bool canceled = UnsavedChanges();
             if (!canceled)
             {
+                SaveSettings();
                 Environment.Exit(0);
             }
         }
@@ -498,6 +544,7 @@ namespace CountEmblems
             }
             else
             {
+                SaveSettings();
                 Environment.Exit(0);
             }
         }
@@ -550,6 +597,38 @@ namespace CountEmblems
                     SaveFile(saveFileDialog3.FileName);
                     File.WriteAllText(PREVIOUS_INI_NAME, saveFileDialog3.FileName);
                 }
+            }
+        }
+        static void SaveSettings()
+        {
+            try
+            {
+                string[] contents = { hotkeysEnabled.ToString(), "", ResetKeyCode, ResetKeyValue.ToString(), "", EnableKeyCode, EnableKeyValue.ToString() };
+                File.WriteAllLines("settings.ini", contents);
+            }
+            catch
+            {
+                MessageBox.Show("Could not save the settings");
+            }
+        }
+        static void LoadSettings()
+        {
+            try
+            {
+                string[] contents = File.ReadAllLines("settings.ini");
+                hotkeysEnabled = bool.Parse(contents[0]);
+                menuGlobalHotkeys.Checked = !hotkeysEnabled;
+                MenuGlobalHotkeys(null, null);
+
+                ResetKeyCode = contents[2];
+                ResetKeyValue = Int32.Parse(contents[3]);
+
+                EnableKeyCode = contents[5];
+                EnableKeyValue = Int32.Parse(contents[6]);
+            }
+            catch
+            {
+                MessageBox.Show("Could not load the settings");
             }
         }
         static void SaveFile(string file)
@@ -726,7 +805,7 @@ namespace CountEmblems
             previousAfterText = textAfter.Text;
             previousTextAfterChecked = textAfterChecked;
 
-            if(textAfterChecked == 1)
+            if (textAfterChecked == 1)
             {
                 textAfterCheck.Checked = true;
                 textAfter.Enabled = true;
@@ -749,6 +828,55 @@ namespace CountEmblems
                 return;
             }
             CancelEdit(null, null);
+        }
+
+        static public void MenuGlobalHotkeys(object sender, EventArgs e)
+        {
+            new Thread(() =>
+            {
+                while(!MainForm.IsHandleCreated)
+                {
+
+                }
+                MainForm.Invoke(new MethodInvoker(delegate
+                {
+                    if (menuGlobalHotkeys.Checked == false)
+                    {
+                        menuGlobalHotkeys.Checked = true;
+                        hotkeysEnabled = true;
+                        TaskbarProgress.SetValue(MainForm.Handle, 100, 100);
+                        TaskbarProgress.SetState(MainForm.Handle, TaskbarProgress.TaskbarStates.Normal);
+
+                    }
+                    else
+                    {
+                        menuGlobalHotkeys.Checked = false;
+                        hotkeysEnabled = false;
+                        TaskbarProgress.SetValue(MainForm.Handle, 100, 100);
+                        TaskbarProgress.SetState(MainForm.Handle, TaskbarProgress.TaskbarStates.Error);
+                    }
+                }));
+            }).Start();
+        }
+
+        static void MenuSetKeys(object sender, EventArgs e)
+        {
+            previousResetKeyCode = ResetKeyCode;
+            previousResetKeyValue = ResetKeyValue;
+            previousEnableKeyCode = EnableKeyCode;
+            previousEnableKeyValue = EnableKeyValue;
+            resetHotkeyText.Text = ResetKeyCode;
+            enableHotkeysText.Text = EnableKeyCode;
+
+            if (KeySetForm.ShowDialog() == DialogResult.OK)
+            {
+                return;
+            }
+            CancelSetKeys(null, null);
+        }
+        static void MenuResetTo0(object sender, EventArgs e)
+        {
+            Reset = true;
         }
         static void AddConstantLabel(string text, System.Drawing.Point location, Form form)
         {
@@ -862,6 +990,20 @@ namespace CountEmblems
                 outlines.Add(new Outline { Color = outline.Color, Thickness = outline.Thickness });
             }
             UpdateText();
+        }
+
+        static void OkSetKeys(object sender, EventArgs e)
+        {
+            
+        }
+        static void CancelSetKeys(object sender, EventArgs e)
+        {
+            ResetKeyCode = previousResetKeyCode;
+            ResetKeyValue = previousResetKeyValue;
+            EnableKeyCode = previousEnableKeyCode;
+            EnableKeyValue = previousEnableKeyValue;
+            resetHotkeyText.Text = previousResetKeyCode;
+            enableHotkeysText.Text = previousEnableKeyCode;
         }
 
         static System.Windows.Forms.Button MakeButton(string text, System.Drawing.Point location, EventHandler eventHandler, Form form)
@@ -1094,8 +1236,8 @@ namespace CountEmblems
         static System.Drawing.Point startDelta;
         static void OnMouseDown(object sender, System.Windows.Forms.MouseEventArgs e)
         {
-            int cursorX = MainForm.PointToClient(Cursor.Position).X;
-            int cursorY = MainForm.PointToClient(Cursor.Position).Y;
+            int cursorX = MainForm.PointToClient(System.Windows.Forms.Cursor.Position).X;
+            int cursorY = MainForm.PointToClient(System.Windows.Forms.Cursor.Position).Y;
             if (e.Button == MouseButtons.Left && cursorX >= rectangle.Left && cursorX <= rectangle.Right && cursorY >= rectangle.Top && cursorY <= rectangle.Bottom)
             {
                 if (MainForm.ContextMenuStrip != null)
@@ -1110,8 +1252,8 @@ namespace CountEmblems
                     movingStarted = true;
                 }
                 startDelta = new System.Drawing.Point(
-                    MainForm.PointToClient(Cursor.Position).X - textLocation.X,
-                    MainForm.PointToClient(Cursor.Position).Y - textLocation.Y);
+                    MainForm.PointToClient(System.Windows.Forms.Cursor.Position).X - textLocation.X,
+                    MainForm.PointToClient(System.Windows.Forms.Cursor.Position).Y - textLocation.Y);
             }
         }
         static void OnMouseMove(object sender, System.Windows.Forms.MouseEventArgs e)
@@ -1119,8 +1261,8 @@ namespace CountEmblems
             if (movingStarted)
             {
                 rectangleB.Location = new System.Drawing.Point(
-                    MainForm.PointToClient(Cursor.Position).X - startDelta.X,
-                    MainForm.PointToClient(Cursor.Position).Y - startDelta.Y);
+                    MainForm.PointToClient(System.Windows.Forms.Cursor.Position).X - startDelta.X,
+                    MainForm.PointToClient(System.Windows.Forms.Cursor.Position).Y - startDelta.Y);
                 int x = Clamp(rectangleB.Location.X, (int)textXUpDown.Minimum, (int)textXUpDown.Maximum - 64);
                 int y = Clamp(rectangleB.Location.Y, (int)textYUpDown.Minimum, (int)textYUpDown.Maximum - 64);
                 textLocation = new System.Drawing.Point(x, y);
@@ -1176,6 +1318,9 @@ namespace CountEmblems
             EditForm = MakeForm(new System.Drawing.Size(245, 415), System.Drawing.Color.FromArgb(240, 240, 240), "Edit Layout");
             MainForm.FormClosing += FormExit;
             MainForm.ResizeEnd += ResizeEnd;
+            KeySetForm = MakeForm(new System.Drawing.Size(295, 175), System.Drawing.Color.FromArgb(240, 240, 240), "Hotkey Settings");
+            KeySetForm.FormClosing += KeySetClosing;
+            KeySetForm.Activated += KeySetForm_Activated;
 
             textToShow = "No text\nto display";
             currentFont = new Font("Arial", 20, System.Drawing.FontStyle.Bold, GraphicsUnit.Point);
@@ -1186,6 +1331,14 @@ namespace CountEmblems
             EventHandler SaveAs_L = new EventHandler(MenuSaveAs_L);
             EventHandler Load_L = new EventHandler(MenuLoad_L);
             EventHandler Edit_L = new EventHandler(MenuEdit_L);
+            EventHandler globalHandler = new EventHandler(MenuGlobalHotkeys);
+            EventHandler setKeysHandler = new EventHandler(MenuSetKeys);
+            EventHandler resetTo0Handler = new EventHandler(MenuResetTo0);
+
+            EventHandler resetBindHandler = new EventHandler(resetBind);
+            EventHandler enableBindHandler = new EventHandler(enableBind);
+            EventHandler OkSetKeyHandler = new EventHandler(OkSetKeys);
+            EventHandler CancelSetKeyHandler = new EventHandler(CancelSetKeys);
 
             EventHandler gamedataButtonHandler = new EventHandler(BrowseGamedata);
             EventHandler outputButtonHandler = new EventHandler(BrowseOutput);
@@ -1207,6 +1360,9 @@ namespace CountEmblems
             EventHandler textAfterHandler = new EventHandler(textAfterChanged);
             EventHandler textAfterCheckHandler = new EventHandler(textAfterCheckChanged);
 
+            menuGlobalHotkeys.Text = "Enable Hotkeys";
+            menuGlobalHotkeys.Click += globalHandler;
+
             System.Windows.Forms.ContextMenu menu = new System.Windows.Forms.ContextMenu();
             menu.MenuItems.Add("Text Input file", IO_Options);
             menu.MenuItems.Add("-");
@@ -1214,6 +1370,10 @@ namespace CountEmblems
             menu.MenuItems.Add("Save layout as...", SaveAs_L);
             menu.MenuItems.Add("Edit layout", Edit_L);
             menu.MenuItems.Add("Load layout", Load_L);
+            menu.MenuItems.Add("-");
+            menu.MenuItems.Add(menuGlobalHotkeys);
+            menu.MenuItems.Add("Set Hotkeys", setKeysHandler);
+            menu.MenuItems.Add("Reset emblem count to 0", resetTo0Handler);
             menu.MenuItems.Add("-");
             menu.MenuItems.Add("Exit", exitHandler);
 
@@ -1398,6 +1558,29 @@ namespace CountEmblems
             buttonCancelEdit.DialogResult = DialogResult.Cancel;
             EditForm.CancelButton = buttonCancelEdit;
 
+            AddConstantLabel("Reset key:", new System.Drawing.Point(10, 10), KeySetForm);
+            resetHotkeyText.Location = new System.Drawing.Point(10, 30);
+            resetHotkeyText.Size = new System.Drawing.Size(180, 20);
+            resetHotkeyText.ReadOnly = true;
+            KeySetForm.Controls.Add(resetHotkeyText);
+            resetBindButton = MakeButton("Bind", new System.Drawing.Point(200, 30), resetBindHandler, KeySetForm);
+            resetBindButton.KeyDown += ResetBindButtonKeyPressed;
+
+            AddConstantLabel("Enable hotkeys key:", new System.Drawing.Point(10, 60), KeySetForm);
+            enableHotkeysText.Location = new System.Drawing.Point(10, 80);
+            enableHotkeysText.Size = new System.Drawing.Size(180, 20);
+            enableHotkeysText.ReadOnly = true;
+            KeySetForm.Controls.Add(enableHotkeysText);
+            enableBindButton = MakeButton("Bind", new System.Drawing.Point(200, 80), enableBindHandler, KeySetForm);
+            enableBindButton.KeyDown += EnableBindButtonKeyPressed;
+
+            Button buttonOkSetKey = MakeButton("OK", new System.Drawing.Point(110, 140), OkSetKeyHandler, KeySetForm);
+            buttonOkSetKey.DialogResult = DialogResult.OK;
+            KeySetForm.AcceptButton = buttonOkSetKey;
+
+            Button buttonCancelSetKey = MakeButton("Cancel", new System.Drawing.Point(200, 140), CancelSetKeyHandler, KeySetForm);
+            buttonCancelSetKey.DialogResult = DialogResult.Cancel;
+            KeySetForm.CancelButton = buttonCancelSetKey;
 
             // Just some default values before loading
             fontColor = System.Drawing.Color.White;
@@ -1426,16 +1609,224 @@ namespace CountEmblems
             {
                 File.Create(PREVIOUS_INI_NAME).Close();
             }
+
+            if (File.Exists("settings.ini"))
+            {
+                LoadSettings();
+            }
+            else
+            {
+                File.Create("settings.ini").Close();
+            }
+
             MainForm.SizeChanged += (o, e) => { MainFormSizeChanged(); };
             MainForm.Controls.Add(renderBox);
             MainForm.Paint += (o, e) => { UpdateText(); };
             Thread.CurrentThread.IsBackground = true;
+            InterceptKeys.SetupHook();
             MainForm.ShowDialog();
+        }
+
+        private static void KeySetForm_Activated(object sender, EventArgs e)
+        {
+            KeySetForm.ActiveControl = null;
+        }
+
+        private static void resetBind(object sender, EventArgs e)
+        {
+            if (isBindingEnable)
+            {
+                isBindingEnable = false;
+                enableBindButton.Text = "Bind";
+            }
+            if (isBindingReset == false)
+            {
+                isBindingReset = true;
+                resetBindButton.Text = "Cancel";
+            }
+            else
+            {
+                isBindingReset = false;
+                resetBindButton.Text = "Bind";
+            }
+        }
+        private static void enableBind(object sender, EventArgs e)
+        {
+            if (isBindingReset)
+            {
+                isBindingReset = false;
+                resetBindButton.Text = "Bind";
+            }
+            if (isBindingEnable == false)
+            {
+                isBindingEnable = true;
+                enableBindButton.Text = "Cancel";
+            }
+            else
+            {
+                isBindingEnable = false;
+                enableBindButton.Text = "Bind";
+            }
+        }
+        private static void EnableBindButtonKeyPressed(object sender, System.Windows.Forms.KeyEventArgs e)
+        {
+            if (isBindingEnable)
+            {
+                EnableKeyValue = e.KeyValue;
+                EnableKeyCode = kc.ConvertToString(EnableKeyValue);
+                enableHotkeysText.Text = EnableKeyCode;
+                KeySetForm.ActiveControl = null;
+                isBindingEnable = false;
+                enableBindButton.Text = "Bind";
+            }
+        }
+        private static void ResetBindButtonKeyPressed(object sender, System.Windows.Forms.KeyEventArgs e)
+        {
+            if (isBindingReset)
+            {
+                ResetKeyValue = e.KeyValue;
+                ResetKeyCode = kc.ConvertToString(ResetKeyValue);
+                resetHotkeyText.Text = ResetKeyCode;
+                KeySetForm.ActiveControl = null;
+                isBindingReset = false;
+                resetBindButton.Text = "Bind";
+            }
         }
 
         private static void MainFormSizeChanged()
         {
             UpdateText();
+        }
+        private static void KeySetClosing(object sender, FormClosingEventArgs e)
+        {
+            if (isBindingEnable || isBindingReset)
+            {
+                e.Cancel = true;
+            }
+        }
+    }
+
+    static class InterceptKeys
+    {
+        private const int WH_KEYBOARD_LL = 13;
+        private const int WM_KEYDOWN = 0x0100;
+        private static LowLevelKeyboardProc _proc = HookCallback;
+        private static IntPtr _hookID = IntPtr.Zero;
+        public static int vkCode;
+
+        public static void SetupHook()
+        {
+            new Thread(() =>
+            {
+                _hookID = SetHook(_proc);
+                Application.Run();
+                UnhookWindowsHookEx(_hookID);
+            }).Start();
+        }
+
+        private static IntPtr SetHook(LowLevelKeyboardProc proc)
+        {
+            using (Process curProcess = Process.GetCurrentProcess())
+            using (ProcessModule curModule = curProcess.MainModule)
+            {
+                return SetWindowsHookEx(WH_KEYBOARD_LL, proc,
+                    GetModuleHandle(curModule.ModuleName), 0);
+            }
+        }
+
+        private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
+
+        private static IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
+        {
+            if (nCode >= 0 && wParam == (IntPtr)WM_KEYDOWN)
+            {
+                vkCode = Marshal.ReadInt32(lParam);
+            }
+            else
+            {
+                vkCode = -1;
+            }
+            if(vkCode == Program.ResetKeyValue && Program.hotkeysEnabled == true)
+            {
+                Program.Reset = true;
+            }
+            if(vkCode == Program.EnableKeyValue)
+            {
+                Program.MenuGlobalHotkeys(null, null);
+            }
+            return CallNextHookEx(_hookID, nCode, wParam, lParam);
+        }
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool UnhookWindowsHookEx(IntPtr hhk);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern IntPtr GetModuleHandle(string lpModuleName);
+    }
+    public static class TaskbarProgress
+    {
+        public enum TaskbarStates
+        {
+            NoProgress = 0,
+            Indeterminate = 0x1,
+            Normal = 0x2,
+            Error = 0x4,
+            Paused = 0x8
+        }
+
+        [ComImport()]
+        [Guid("ea1afb91-9e28-4b86-90e9-9e9f8a5eefaf")]
+        [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface ITaskbarList3
+        {
+            // ITaskbarList
+            [PreserveSig]
+            void HrInit();
+            [PreserveSig]
+            void AddTab(IntPtr hwnd);
+            [PreserveSig]
+            void DeleteTab(IntPtr hwnd);
+            [PreserveSig]
+            void ActivateTab(IntPtr hwnd);
+            [PreserveSig]
+            void SetActiveAlt(IntPtr hwnd);
+
+            // ITaskbarList2
+            [PreserveSig]
+            void MarkFullscreenWindow(IntPtr hwnd, [MarshalAs(UnmanagedType.Bool)] bool fFullscreen);
+
+            // ITaskbarList3
+            [PreserveSig]
+            void SetProgressValue(IntPtr hwnd, UInt64 ullCompleted, UInt64 ullTotal);
+            [PreserveSig]
+            void SetProgressState(IntPtr hwnd, TaskbarStates state);
+        }
+
+        [ComImport()]
+        [Guid("56fdf344-fd6d-11d0-958a-006097c9a090")]
+        [ClassInterface(ClassInterfaceType.None)]
+        private class TaskbarInstance
+        {
+        }
+
+        private static ITaskbarList3 taskbarInstance = (ITaskbarList3)new TaskbarInstance();
+        private static bool taskbarSupported = Environment.OSVersion.Version >= new Version(6, 1);
+
+        public static void SetState(IntPtr windowHandle, TaskbarStates taskbarState)
+        {
+            if (taskbarSupported) taskbarInstance.SetProgressState(windowHandle, taskbarState);
+        }
+
+        public static void SetValue(IntPtr windowHandle, double progressValue, double progressMax)
+        {
+            if (taskbarSupported) taskbarInstance.SetProgressValue(windowHandle, (ulong)progressValue, (ulong)progressMax);
         }
     }
 }
