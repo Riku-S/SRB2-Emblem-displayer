@@ -18,6 +18,7 @@ namespace CountEmblems
     class Program
     {
         static MenuItem menuGlobalHotkeys = new MenuItem();
+        static MenuItem menuReset = new MenuItem();
         static public bool hotkeysEnabled;
         static Button resetBindButton = new Button();
         static Button enableBindButton = new Button();
@@ -26,6 +27,7 @@ namespace CountEmblems
 
         static public bool Reset;
         static public bool previousReset;
+        static public bool canReset;
 
         static KeysConverter kc = new KeysConverter();
 
@@ -404,6 +406,20 @@ namespace CountEmblems
             if (Reset == true && total != previousTotal)
             {
                 Reset = false;
+            }
+
+            if (total == 1 && total != previousTotal)
+            {
+                canReset = false;
+                menuReset.Enabled = false;
+                menuReset.Text = "Can't reset with 1 emblem";
+                
+            }
+            if (total != 1)
+            {
+                canReset = true;
+                menuReset.Enabled = true;
+                menuReset.Text = "Reset emblem count to 0";
             }
 
             if ((total != previousTotal || textAfterValue != previousAfterText2 || textAfterChecked != previousAfterCheck) && Reset == false)
@@ -1363,6 +1379,9 @@ namespace CountEmblems
             menuGlobalHotkeys.Text = "Enable Hotkeys";
             menuGlobalHotkeys.Click += globalHandler;
 
+            menuReset.Text = "Reset emblem count to 0";
+            menuReset.Click += resetTo0Handler;
+
             System.Windows.Forms.ContextMenu menu = new System.Windows.Forms.ContextMenu();
             menu.MenuItems.Add("Text Input file", IO_Options);
             menu.MenuItems.Add("-");
@@ -1373,7 +1392,7 @@ namespace CountEmblems
             menu.MenuItems.Add("-");
             menu.MenuItems.Add(menuGlobalHotkeys);
             menu.MenuItems.Add("Set Hotkeys", setKeysHandler);
-            menu.MenuItems.Add("Reset emblem count to 0", resetTo0Handler);
+            menu.MenuItems.Add(menuReset);
             menu.MenuItems.Add("-");
             menu.MenuItems.Add("Exit", exitHandler);
 
@@ -1746,11 +1765,11 @@ namespace CountEmblems
             {
                 vkCode = -1;
             }
-            if(vkCode == Program.ResetKeyValue && Program.hotkeysEnabled == true)
+            if (vkCode == Program.ResetKeyValue && Program.hotkeysEnabled == true && Program.canReset == true)
             {
                 Program.Reset = true;
             }
-            if(vkCode == Program.EnableKeyValue)
+            if (vkCode == Program.EnableKeyValue)
             {
                 Program.MenuGlobalHotkeys(null, null);
             }
