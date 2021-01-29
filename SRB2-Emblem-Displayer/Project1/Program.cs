@@ -15,8 +15,16 @@ using System.Runtime.Remoting.Contexts;
 
 namespace CountEmblems
 {
+
     class Program
     {
+        [DllImport("kernel32.dll")]
+        public static extern bool ReadProcessMemory(IntPtr hProcess,
+            int lpBaseAddress, byte[] lpBuffer, int dwSize, IntPtr lpNumberOfBytesRead);
+
+        static Process gameProc;
+        public static bool gameHooked = false;
+
         static MenuItem menuGlobalHotkeys = new MenuItem();
         static MenuItem menuReset = new MenuItem();
         static public bool hotkeysEnabled;
@@ -328,50 +336,60 @@ namespace CountEmblems
                 UpdateText();
             }
         }
-        static byte ReadByte(ref byte[] bytes)
+
+        private static void GameProc_Exited(object sender, EventArgs e)
         {
-            byte value = bytes[0];
-            bytes = bytes.Skip(1).ToArray();
-            return value;
+            gameProc.Exited -= GameProc_Exited;
+            gameHooked = false;
         }
-        static int CountEmblems(ref byte[] bytes, int max_emblems)
-        {
-            int result = 0;
-            for (int i = 0; i < max_emblems;)
-            {
-                // Function directly copied from SRB2 source code, where the gamedata handling happens
-                int j;
-                byte rtemp = ReadByte(ref bytes);
-                for (j = 0; j < 8 && j + i < max_emblems; ++j)
-                    result += ((rtemp >> j) & 1);
-                i += j;
-            }
-            return result;
-        }
+
         static void Analyze_file(string fileName, string outputName)
         {
-            byte[] bytes;
             int total = previousTotal;
-            if (fileName != null && fileName != "")
+
+            int address;
+            if (gameHooked)
             {
                 try
                 {
-                    bytes = File.ReadAllBytes(fileName);
-                    // We don't want to read empty/corrupted gamedata
-                    if (bytes.Length < SKIPPED_BYTES + MAXEMBLEMS + MAXEXTRAEMBLEMS && previousError != "short")
+                    byte[] maxEmblemsBuffer = new byte[4];
+                    byte[] maxExtraBuffer = new byte[4];
+
+                    ReadProcessMemory(gameProc.Handle, 0x0082E0E4, maxEmblemsBuffer, 1, IntPtr.Zero);
+                    ReadProcessMemory(gameProc.Handle, 0x0082E0E0, maxExtraBuffer, 1, IntPtr.Zero);
+
+                    int maxEmblems = BitConverter.ToInt32(maxEmblemsBuffer, 0);
+                    int maxExtra = BitConverter.ToInt32(maxExtraBuffer, 0);
+
+                    byte[] currentEmblem = new byte[1];
+
+                    int emblems = 0;
+                    address = 0x059F477E;
+                    for (int i = 0; i < maxEmblems; i++)
                     {
-                        //Console.WriteLine("The gamedata is too short.");
-                        previousError = "short";
+                        ReadProcessMemory(gameProc.Handle, address, currentEmblem, 1, IntPtr.Zero);
+                        if (currentEmblem[0] == 1)
+                        {
+                            emblems++;
+                        }
+                        address += 0x80;
                     }
-                    else
+
+                    int extraEmblems = 0;
+                    address = 0x059F4302;
+                    for (int i = 0; i < maxExtra; i++)
                     {
-                        bytes = bytes.Skip(SKIPPED_BYTES).ToArray();
-                        int emblems = CountEmblems(ref bytes, MAXEMBLEMS);
-                        int extraEmblems = CountEmblems(ref bytes, MAXEXTRAEMBLEMS);
-                        total = emblems + extraEmblems;
+                        ReadProcessMemory(gameProc.Handle, address, currentEmblem, 1, IntPtr.Zero);
+                        if (currentEmblem[0] == 1)
+                        {
+                            extraEmblems++;
+                        }
+                        address += 0x44;
                     }
+
+                    total = emblems + extraEmblems;
                 }
-                catch (FileNotFoundException e)
+                catch (Exception e)
                 {
                     string errorName = e.GetType().Name;
                     // We don't want error spam for every loop
@@ -381,9 +399,19 @@ namespace CountEmblems
                         MessageBox.Show(errorName + ": " + e.Message, errorName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
                 }
+            }
+            else
+            {
+                try 
+                { 
+                    gameProc = Process.GetProcessesByName("srb2win").First(); 
+                    gameProc.Exited += GameProc_Exited;
+                    gameProc.EnableRaisingEvents = true;
+                    gameHooked = true;
+                }
                 catch
                 {
-
+                    Thread.Sleep(1000);
                 }
             }
 
