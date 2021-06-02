@@ -24,6 +24,31 @@ namespace CountEmblems
 
         static Process gameProc;
         public static bool gameHooked = false;
+        
+        //Memory Addresses things
+        //==================================================//
+        private const int SizeOfExtraEmblemsData = 0x47C;
+
+        //SrbWin228
+        private const int TotalExtraEmblemsAddress_Win228 = 0x0082E0E0;
+        private const int TotalEmblemsAddress_Win228 = TotalExtraEmblemsAddress_Win228 + sizeof(int);
+
+        private const int ExtraEmblemsStartAddress_Win228 = 0x059F4302;
+        private const int EmblemsStartAddress_Win228 = ExtraEmblemsStartAddress_Win228 + SizeOfExtraEmblemsData;
+        
+        //SrbWin229
+        private const int TotalExtraEmblemsAddress_Win229 = 0x0090EA20;
+        private const int TotalEmblemsAddress_Win229 = TotalExtraEmblemsAddress_Win229 + sizeof(int);
+
+        private const int ExtraEmblemsStartAddress_Win229 = 0x0090FC02;
+        private const int EmblemsStartAddress_Win229 = ExtraEmblemsStartAddress_Win229 + SizeOfExtraEmblemsData;
+        //==================================================//
+
+        public static int totalExtraEmblemsAddress;
+        public static int totalEmblemsAddress;
+        
+        public static int extraEmblemsStartAddress;
+        public static int emblemsStartAddress;
 
         static MenuItem menuGlobalHotkeys = new MenuItem();
         static MenuItem menuReset = new MenuItem();
@@ -355,8 +380,8 @@ namespace CountEmblems
                     byte[] maxEmblemsBuffer = new byte[4];
                     byte[] maxExtraBuffer = new byte[4];
 
-                    ReadProcessMemory(gameProc.Handle, 0x0090EA24, maxEmblemsBuffer, 1, IntPtr.Zero);
-                    ReadProcessMemory(gameProc.Handle, 0x0090EA20, maxExtraBuffer, 1, IntPtr.Zero);
+                    ReadProcessMemory(gameProc.Handle, totalExtraEmblemsAddress, maxEmblemsBuffer, 1, IntPtr.Zero);
+                    ReadProcessMemory(gameProc.Handle, totalEmblemsAddress, maxExtraBuffer, 1, IntPtr.Zero);
 
                     int maxEmblems = BitConverter.ToInt32(maxEmblemsBuffer, 0);
                     int maxExtra = BitConverter.ToInt32(maxExtraBuffer, 0);
@@ -364,7 +389,7 @@ namespace CountEmblems
                     byte[] currentEmblem = new byte[1];
 
                     int emblems = 0;
-                    address = 0x0091007E;
+                    address = emblemsStartAddress;
                     for (int i = 0; i < maxEmblems; i++)
                     {
                         ReadProcessMemory(gameProc.Handle, address, currentEmblem, 1, IntPtr.Zero);
@@ -376,7 +401,7 @@ namespace CountEmblems
                     }
 
                     int extraEmblems = 0;
-                    address = 0x0090FC02;
+                    address = extraEmblemsStartAddress;
                     for (int i = 0; i < maxExtra; i++)
                     {
                         ReadProcessMemory(gameProc.Handle, address, currentEmblem, 1, IntPtr.Zero);
@@ -386,11 +411,6 @@ namespace CountEmblems
                         }
                         address += 0x44;
                     }
-                    // Console.WriteLine("max emblem buffer " + maxEmblemsBuffer[0]);
-                    // Console.WriteLine("max extra buffer " + maxExtraBuffer[0]);
-                    // Console.WriteLine("emblems " + emblems);
-                    // Console.WriteLine("Extra Emblems = " + extraEmblems);
-                    // Console.WriteLine("total = " + total);
                     total = emblems + extraEmblems;
                     
                 }
@@ -410,7 +430,10 @@ namespace CountEmblems
             {
                 try 
                 { 
-                    gameProc = Process.GetProcessesByName("srb2win").First(); 
+                    gameProc = Process.GetProcessesByName("srb2win").First();
+
+                    UpdateMemoryAddresses();
+
                     gameProc.Exited += GameProc_Exited;
                     gameProc.EnableRaisingEvents = true;
                     gameHooked = true;
@@ -496,6 +519,30 @@ namespace CountEmblems
             previousAfterCheck = textAfterChecked;
             previousAfterText2 = textAfterValue;
             previousReset = Reset;
+        }
+
+        private static void UpdateMemoryAddresses()
+        {
+            if (gameProc.Modules[0].ModuleMemorySize == 99930112)
+            {
+                extraEmblemsStartAddress = ExtraEmblemsStartAddress_Win228;
+                emblemsStartAddress = EmblemsStartAddress_Win228;
+
+                totalExtraEmblemsAddress = TotalExtraEmblemsAddress_Win228;
+                totalEmblemsAddress = TotalEmblemsAddress_Win228;
+            }
+            else if (gameProc.Modules[0].ModuleMemorySize == 101171200)
+            {
+                extraEmblemsStartAddress = ExtraEmblemsStartAddress_Win229;
+                emblemsStartAddress = EmblemsStartAddress_Win229;
+
+                totalExtraEmblemsAddress = TotalExtraEmblemsAddress_Win229;
+                totalEmblemsAddress = TotalEmblemsAddress_Win229;
+            }
+            else
+            {
+                MessageBox.Show("Unsupported game version", "SRB2 Emblem Displayer", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
 
         static Form MakeForm(System.Drawing.Size size, System.Drawing.Color backcolor, string windowTitle)
