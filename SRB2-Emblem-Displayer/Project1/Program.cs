@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -346,7 +346,7 @@ namespace CountEmblems
         static void Analyze_file(string fileName, string outputName)
         {
             int total = previousTotal;
-
+            
             int address;
             if (gameHooked)
             {
@@ -355,8 +355,8 @@ namespace CountEmblems
                     byte[] maxEmblemsBuffer = new byte[4];
                     byte[] maxExtraBuffer = new byte[4];
 
-                    ReadProcessMemory(gameProc.Handle, 0x0082E0E4, maxEmblemsBuffer, 1, IntPtr.Zero);
-                    ReadProcessMemory(gameProc.Handle, 0x0082E0E0, maxExtraBuffer, 1, IntPtr.Zero);
+                    ReadProcessMemory(gameProc.Handle, 0x0090EA24, maxEmblemsBuffer, 1, IntPtr.Zero);
+                    ReadProcessMemory(gameProc.Handle, 0x0090EA20, maxExtraBuffer, 1, IntPtr.Zero);
 
                     int maxEmblems = BitConverter.ToInt32(maxEmblemsBuffer, 0);
                     int maxExtra = BitConverter.ToInt32(maxExtraBuffer, 0);
@@ -364,7 +364,7 @@ namespace CountEmblems
                     byte[] currentEmblem = new byte[1];
 
                     int emblems = 0;
-                    address = 0x059F477E;
+                    address = 0x0091007E;
                     for (int i = 0; i < maxEmblems; i++)
                     {
                         ReadProcessMemory(gameProc.Handle, address, currentEmblem, 1, IntPtr.Zero);
@@ -376,7 +376,7 @@ namespace CountEmblems
                     }
 
                     int extraEmblems = 0;
-                    address = 0x059F4302;
+                    address = 0x0090FC02;
                     for (int i = 0; i < maxExtra; i++)
                     {
                         ReadProcessMemory(gameProc.Handle, address, currentEmblem, 1, IntPtr.Zero);
@@ -386,9 +386,15 @@ namespace CountEmblems
                         }
                         address += 0x44;
                     }
-
+                    // Console.WriteLine("max emblem buffer " + maxEmblemsBuffer[0]);
+                    // Console.WriteLine("max extra buffer " + maxExtraBuffer[0]);
+                    // Console.WriteLine("emblems " + emblems);
+                    // Console.WriteLine("Extra Emblems = " + extraEmblems);
+                    // Console.WriteLine("total = " + total);
                     total = emblems + extraEmblems;
+                    
                 }
+                
                 catch (Exception e)
                 {
                     string errorName = e.GetType().Name;
