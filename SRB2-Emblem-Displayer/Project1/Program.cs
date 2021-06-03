@@ -380,8 +380,8 @@ namespace CountEmblems
                     byte[] maxEmblemsBuffer = new byte[4];
                     byte[] maxExtraBuffer = new byte[4];
 
-                    ReadProcessMemory(gameProc.Handle, totalExtraEmblemsAddress, maxEmblemsBuffer, 1, IntPtr.Zero);
-                    ReadProcessMemory(gameProc.Handle, totalEmblemsAddress, maxExtraBuffer, 1, IntPtr.Zero);
+                    ReadProcessMemory(gameProc.Handle, totalEmblemsAddress, maxEmblemsBuffer, 1, IntPtr.Zero);
+                    ReadProcessMemory(gameProc.Handle, totalExtraEmblemsAddress, maxExtraBuffer, 1, IntPtr.Zero);
 
                     int maxEmblems = BitConverter.ToInt32(maxEmblemsBuffer, 0);
                     int maxExtra = BitConverter.ToInt32(maxExtraBuffer, 0);
