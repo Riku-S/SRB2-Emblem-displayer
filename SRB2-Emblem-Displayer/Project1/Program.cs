@@ -4,14 +4,9 @@ using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
 using System.Drawing;
-using System.Windows;
-using System.Windows.Media;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.ComponentModel;
-using System.Windows.Input;
-using System.Runtime.Remoting.Contexts;
 
 namespace CountEmblems
 {
@@ -24,9 +19,19 @@ namespace CountEmblems
 
         static Process gameProc;
         public static bool gameHooked = false;
-        
-        //Memory Addresses things
-        //==================================================//
+
+        // Memory Addresses things
+        // ==================================================//
+
+        // 2.1
+        private const int EmblemsStartAddress_Win2125_64 = 0x005C101E;
+        private const int ExtraEmblemsStartAddress_Win2125_64 = 0x005C0BDF;
+
+        private const int EmblemsStartAddress_Win2125_32 = 0x00596E5E;
+        private const int ExtraEmblemsStartAddress_Win2125_32 = 0x00596A1F;
+        // ==============================================//
+
+        // 2.2
         private const int SizeOfExtraEmblemsData = 0x47C;
 
         //SrbWin228
@@ -42,6 +47,13 @@ namespace CountEmblems
 
         private const int ExtraEmblemsStartAddress_Win229 = 0x0090FC02;
         private const int EmblemsStartAddress_Win229 = ExtraEmblemsStartAddress_Win229 + SizeOfExtraEmblemsData;
+
+        private const int GameDataStructPointerAddress_Win2213 = 0xA58CE8;
+        private const int EmblemsStartOffset_Win2213 = 0x204;
+        private const int ExtraEmblemsStartOffset_Win2213 = EmblemsStartOffset_Win2213 + 2048;
+
+        private const int AllocatedEmblemsCount_Win2213 = 512;
+        private const int AllocatedExtraEmblemsCount_Win2213 = 48;
         //==================================================//
 
         public static int totalExtraEmblemsAddress;
@@ -50,28 +62,22 @@ namespace CountEmblems
         public static int extraEmblemsStartAddress;
         public static int emblemsStartAddress;
 
-        static MenuItem menuGlobalHotkeys = new MenuItem();
-        static MenuItem menuReset = new MenuItem();
-        static public bool hotkeysEnabled;
-        static Button resetBindButton = new Button();
-        static Button enableBindButton = new Button();
-        static bool isBindingReset = false;
-        static bool isBindingEnable = false;
+        // new mem reading
+        public static int gameDataStructPointerAddress;
+        public static int emblemsStartOffset;
+        public static int extraEmblemsStartOffset;
+
+        public static int allocatedEmblemsCount;
+        public static int allocatedExtraEmblemsCount;
+
+        public delegate int EmblemCounter();
+
+        public static EmblemCounter currentEmblemCounter;
 
         static public bool Reset;
         static public bool previousReset;
         static public bool canReset;
 
-        static KeysConverter kc = new KeysConverter();
-
-        static string ResetKeyCode = "None";
-        static public int ResetKeyValue = 0;
-        static string EnableKeyCode = "None";
-        static public int EnableKeyValue = 0;
-        static string previousResetKeyCode = "None";
-        static int previousResetKeyValue = 0;
-        static string previousEnableKeyCode = "None";
-        static int previousEnableKeyValue = 0;
         class Outline
         {
             public int Thickness;
@@ -84,14 +90,9 @@ namespace CountEmblems
         static int previousTotal;
         // Previous error in the loop
         static string previousError;
-        // 4 (version check) + 4 (playtime) + 1 (modified) + 1035 (maps visited)
-        const int SKIPPED_BYTES = 1044;
-        const int MAXEMBLEMS = 512;
-        const int MAXEXTRAEMBLEMS = 16;
         const int NO_PREVIOUS_TOTAL = -1;
         const string PREVIOUS_INI_NAME = "previous.ini";
         const string CURRENT_INI_NAME = "current.ini";
-        static string previousFileName;
         static string previousOutputName;
         static string previousAfterText;
         static string previousAfterText2;
@@ -99,15 +100,11 @@ namespace CountEmblems
         static Form MainForm;
         static Form IOForm;
         static Form EditForm;
-        static Form KeySetForm;
         //static System.Windows.Forms.Label emblemLabel;
         static System.Windows.Forms.Button button2FontColor;
         static System.Windows.Forms.Button button2FontColor2;
         static System.Windows.Forms.Button button2BackgroundColor;
-        static System.Windows.Forms.TextBox gamedataBox;
         static TextBox outputBox;
-        static TextBox resetHotkeyText = new TextBox();
-        static TextBox enableHotkeysText = new TextBox();
         static System.Drawing.Color previousFontColor;
         static System.Drawing.Color previousFontColor2;
         static System.Drawing.Color previousBackColor;
@@ -180,21 +177,6 @@ namespace CountEmblems
             {
                 textToShowMember = value;
                 UpdateText();
-            }
-        }
-
-        // The input file name
-        static string fileNameMember;
-        static string fileName
-        {
-            get { return fileNameMember; }
-            set
-            {
-                fileNameMember = value;
-                if (gamedataBox != null)
-                {
-                    gamedataBox.Text = value;
-                }
             }
         }
 
@@ -368,63 +350,169 @@ namespace CountEmblems
             gameHooked = false;
         }
 
-        static void Analyze_file(string fileName, string outputName)
+        private static int TwoDotOneMemoryReading()
+        {
+            int address;
+
+            try
+            {
+                int maxEmblems = 512;
+                int maxExtra = 16;
+
+                byte[] currentEmblem = new byte[1];
+
+                int emblems = 0;
+                address = emblemsStartAddress;
+                for (int i = 0; i < maxEmblems; i++)
+                {
+                    ReadProcessMemory(gameProc.Handle, address, currentEmblem, 1, IntPtr.Zero);
+                    if (currentEmblem[0] == 1)
+                    {
+                        emblems++;
+                    }
+                    address += 128;
+                }
+
+                int extraEmblems = 0;
+                address = extraEmblemsStartAddress;
+                for (int i = 0; i < maxExtra; i++)
+                {
+                    ReadProcessMemory(gameProc.Handle, address, currentEmblem, 1, IntPtr.Zero);
+                    if (currentEmblem[0] == 1)
+                    {
+                        extraEmblems++;
+                    }
+                    address += 64;
+                }
+                return emblems + extraEmblems;
+
+            }
+
+            catch (Exception e)
+            {
+                string errorName = e.GetType().Name;
+                // We don't want error spam for every loop
+                if (previousError != errorName)
+                {
+                    previousError = errorName;
+                    MessageBox.Show(errorName + ": " + e.Message, errorName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+
+                return previousTotal;
+            }
+        }
+
+        private static int OldMemoryReading()
+        {
+            int address;
+
+            try
+            {
+                byte[] maxEmblemsBuffer = new byte[4];
+                byte[] maxExtraBuffer = new byte[4];
+
+                ReadProcessMemory(gameProc.Handle, totalEmblemsAddress, maxEmblemsBuffer, 1, IntPtr.Zero);
+                ReadProcessMemory(gameProc.Handle, totalExtraEmblemsAddress, maxExtraBuffer, 1, IntPtr.Zero);
+
+                int maxEmblems = BitConverter.ToInt32(maxEmblemsBuffer, 0);
+                int maxExtra = BitConverter.ToInt32(maxExtraBuffer, 0);
+
+                byte[] currentEmblem = new byte[1];
+
+                int emblems = 0;
+                address = emblemsStartAddress;
+                for (int i = 0; i < maxEmblems; i++)
+                {
+                    ReadProcessMemory(gameProc.Handle, address, currentEmblem, 1, IntPtr.Zero);
+                    if (currentEmblem[0] == 1)
+                    {
+                        emblems++;
+                    }
+                    address += 0x80;
+                }
+
+                int extraEmblems = 0;
+                address = extraEmblemsStartAddress;
+                for (int i = 0; i < maxExtra; i++)
+                {
+                    ReadProcessMemory(gameProc.Handle, address, currentEmblem, 1, IntPtr.Zero);
+                    if (currentEmblem[0] == 1)
+                    {
+                        extraEmblems++;
+                    }
+                    address += 0x44;
+                }
+                return emblems + extraEmblems;
+
+            }
+
+            catch (Exception e)
+            {
+                string errorName = e.GetType().Name;
+                // We don't want error spam for every loop
+                if (previousError != errorName)
+                {
+                    previousError = errorName;
+                    MessageBox.Show(errorName + ": " + e.Message, errorName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+
+                return previousTotal;
+            }
+        }
+
+        private static int NewMemReading()
+        {
+            try
+            {
+                int address;
+                byte[] currentEmblem = new byte[1];
+
+                int emblems = 0;
+                address = emblemsStartAddress;
+                for (int i = 0; i < allocatedEmblemsCount; i++)
+                {
+                    ReadProcessMemory(gameProc.Handle, address, currentEmblem, 1, IntPtr.Zero);
+                    if (currentEmblem[0] == 1)
+                        emblems++;
+
+                    address += 4;
+                }
+
+                int extraEmblems = 0;
+                address = extraEmblemsStartAddress;
+                for (int i = 0; i < allocatedExtraEmblemsCount; i++)
+                {
+                    ReadProcessMemory(gameProc.Handle, address, currentEmblem, 1, IntPtr.Zero);
+                    if (currentEmblem[0] == 1)
+                        extraEmblems++;
+
+                    address += 4;
+                }
+                return emblems + extraEmblems;
+
+            }
+
+            catch (Exception e)
+            {
+                string errorName = e.GetType().Name;
+                // We don't want error spam for every loop
+                if (previousError != errorName)
+                {
+                    previousError = errorName;
+                    MessageBox.Show(errorName + ": " + e.Message, errorName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+
+                return previousTotal;
+            }
+        }
+
+        static void Analyze_file(string outputName)
         {
             int total = previousTotal;
             
-            int address;
             if (gameHooked)
             {
-                try
-                {
-                    byte[] maxEmblemsBuffer = new byte[4];
-                    byte[] maxExtraBuffer = new byte[4];
-
-                    ReadProcessMemory(gameProc.Handle, totalEmblemsAddress, maxEmblemsBuffer, 1, IntPtr.Zero);
-                    ReadProcessMemory(gameProc.Handle, totalExtraEmblemsAddress, maxExtraBuffer, 1, IntPtr.Zero);
-
-                    int maxEmblems = BitConverter.ToInt32(maxEmblemsBuffer, 0);
-                    int maxExtra = BitConverter.ToInt32(maxExtraBuffer, 0);
-
-                    byte[] currentEmblem = new byte[1];
-
-                    int emblems = 0;
-                    address = emblemsStartAddress;
-                    for (int i = 0; i < maxEmblems; i++)
-                    {
-                        ReadProcessMemory(gameProc.Handle, address, currentEmblem, 1, IntPtr.Zero);
-                        if (currentEmblem[0] == 1)
-                        {
-                            emblems++;
-                        }
-                        address += 0x80;
-                    }
-
-                    int extraEmblems = 0;
-                    address = extraEmblemsStartAddress;
-                    for (int i = 0; i < maxExtra; i++)
-                    {
-                        ReadProcessMemory(gameProc.Handle, address, currentEmblem, 1, IntPtr.Zero);
-                        if (currentEmblem[0] == 1)
-                        {
-                            extraEmblems++;
-                        }
-                        address += 0x44;
-                    }
-                    total = emblems + extraEmblems;
-                    
-                }
-                
-                catch (Exception e)
-                {
-                    string errorName = e.GetType().Name;
-                    // We don't want error spam for every loop
-                    if (previousError != errorName)
-                    {
-                        previousError = errorName;
-                        MessageBox.Show(errorName + ": " + e.Message, errorName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    }
-                }
+                total = currentEmblemCounter();
             }
             else
             {
@@ -432,11 +520,12 @@ namespace CountEmblems
                 { 
                     gameProc = Process.GetProcessesByName("srb2win").First();
 
-                    UpdateMemoryAddresses();
-
-                    gameProc.Exited += GameProc_Exited;
-                    gameProc.EnableRaisingEvents = true;
-                    gameHooked = true;
+                    if (UpdateMemoryAddressesAndVersion())
+                    {
+                        gameProc.Exited += GameProc_Exited;
+                        gameProc.EnableRaisingEvents = true;
+                        gameHooked = true;
+                    }
                 }
                 catch
                 {
@@ -468,15 +557,11 @@ namespace CountEmblems
             if (total == 1 && total != previousTotal)
             {
                 canReset = false;
-                menuReset.Enabled = false;
-                menuReset.Text = "Can't reset with 1 emblem";
                 
             }
             if (total != 1)
             {
                 canReset = true;
-                menuReset.Enabled = true;
-                menuReset.Text = "Reset emblem count to 0";
             }
 
             if ((total != previousTotal || textAfterValue != previousAfterText2 || textAfterChecked != previousAfterCheck) && Reset == false)
@@ -521,8 +606,27 @@ namespace CountEmblems
             previousReset = Reset;
         }
 
-        private static void UpdateMemoryAddresses()
+        private static bool UpdateMemoryAddressesAndVersion()
         {
+            // 2.1.25 64 bits
+            if (gameProc.Modules[0].ModuleMemorySize == 22024192)
+            {
+                extraEmblemsStartAddress = ExtraEmblemsStartAddress_Win2125_64;
+                emblemsStartAddress = EmblemsStartAddress_Win2125_64;
+
+                currentEmblemCounter = TwoDotOneMemoryReading;
+                return true;
+            }
+            // 2.1.25 32 bits
+            if (gameProc.Modules[0].ModuleMemorySize == 21602304)
+            {
+                extraEmblemsStartAddress = ExtraEmblemsStartAddress_Win2125_32;
+                emblemsStartAddress = EmblemsStartAddress_Win2125_32;
+
+                currentEmblemCounter = TwoDotOneMemoryReading;
+                return true;
+            }
+            // 2.2.8
             if (gameProc.Modules[0].ModuleMemorySize == 99930112)
             {
                 extraEmblemsStartAddress = ExtraEmblemsStartAddress_Win228;
@@ -530,7 +634,11 @@ namespace CountEmblems
 
                 totalExtraEmblemsAddress = TotalExtraEmblemsAddress_Win228;
                 totalEmblemsAddress = TotalEmblemsAddress_Win228;
+
+                currentEmblemCounter = OldMemoryReading;
+                return true;
             }
+            // 2.2.9
             else if (gameProc.Modules[0].ModuleMemorySize == 101171200)
             {
                 extraEmblemsStartAddress = ExtraEmblemsStartAddress_Win229;
@@ -538,11 +646,60 @@ namespace CountEmblems
 
                 totalExtraEmblemsAddress = TotalExtraEmblemsAddress_Win229;
                 totalEmblemsAddress = TotalEmblemsAddress_Win229;
+
+                currentEmblemCounter = OldMemoryReading;
+                return true;
+            }
+            // 2.2.13
+            else if (gameProc.Modules[0].ModuleMemorySize == 82452480)
+            {
+                gameDataStructPointerAddress = GameDataStructPointerAddress_Win2213;
+                emblemsStartOffset = EmblemsStartOffset_Win2213;
+                extraEmblemsStartOffset = ExtraEmblemsStartOffset_Win2213;
+
+                allocatedEmblemsCount = AllocatedEmblemsCount_Win2213;
+                allocatedExtraEmblemsCount = AllocatedExtraEmblemsCount_Win2213;
+
+                currentEmblemCounter = NewMemReading;
+                return VerifyGameDataReady();
             }
             else
             {
                 MessageBox.Show("Unsupported game version", "SRB2 Emblem Displayer", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return true;
             }
+        }
+
+        private static bool VerifyGameDataReady()
+        {
+            byte[] buffer = new byte[4];
+
+            // Reading the static address pointing to the clientGamedata pointer variable
+            bool pointerReadResult = ReadProcessMemory(gameProc.Handle, gameDataStructPointerAddress, buffer, 4, IntPtr.Zero);
+            if (!pointerReadResult)
+                return false;
+
+            // Converting it to an address
+            int gameDataAddress = BitConverter.ToInt32(buffer, 0);
+            if (gameDataAddress == 0)
+                return false;
+
+            buffer = new byte[1];
+
+            // Reading the ready boolean from the game data struct
+            bool gameDataReadyReadResult = ReadProcessMemory(gameProc.Handle, gameDataAddress, buffer, 1, IntPtr.Zero);
+            if (!gameDataReadyReadResult)
+                return false;
+
+            // We are ready! setup the addresses and return to caller
+            if (buffer[0] == 1)
+            {
+                emblemsStartAddress = gameDataAddress + emblemsStartOffset;
+                extraEmblemsStartAddress = gameDataAddress + extraEmblemsStartOffset;
+                return true;
+            }
+
+            return false;
         }
 
         static Form MakeForm(System.Drawing.Size size, System.Drawing.Color backcolor, string windowTitle)
@@ -628,7 +785,6 @@ namespace CountEmblems
             bool canceled = UnsavedChanges();
             if (!canceled)
             {
-                SaveSettings();
                 Environment.Exit(0);
             }
         }
@@ -641,13 +797,11 @@ namespace CountEmblems
             }
             else
             {
-                SaveSettings();
                 Environment.Exit(0);
             }
         }
         static void MenuIO_Options(object sender, EventArgs e)
         {
-            previousFileName = fileName;
             previousOutputName = outputName;
             Thread.CurrentThread.IsBackground = true;
             if (IOForm.ShowDialog() == DialogResult.OK)
@@ -696,38 +850,6 @@ namespace CountEmblems
                 }
             }
         }
-        static void SaveSettings()
-        {
-            try
-            {
-                string[] contents = { hotkeysEnabled.ToString(), "", ResetKeyCode, ResetKeyValue.ToString(), "", EnableKeyCode, EnableKeyValue.ToString() };
-                File.WriteAllLines("settings.ini", contents);
-            }
-            catch
-            {
-                MessageBox.Show("Could not save the settings");
-            }
-        }
-        static void LoadSettings()
-        {
-            try
-            {
-                string[] contents = File.ReadAllLines("settings.ini");
-                hotkeysEnabled = bool.Parse(contents[0]);
-                menuGlobalHotkeys.Checked = !hotkeysEnabled;
-                MenuGlobalHotkeys(null, null);
-
-                ResetKeyCode = contents[2];
-                ResetKeyValue = Int32.Parse(contents[3]);
-
-                EnableKeyCode = contents[5];
-                EnableKeyValue = Int32.Parse(contents[6]);
-            }
-            catch
-            {
-                MessageBox.Show("Could not load the settings");
-            }
-        }
         static void SaveFile(string file)
         {
             try
@@ -770,7 +892,7 @@ namespace CountEmblems
                 }
 
                 FontConverter fc = new FontConverter();
-                string[] contents = { fileName, outputName, fontColorS, fontColorS2, gradientS, backColorS, fc.ConvertToString(currentFont), size, location, textAfterChecked.ToString(), textAfterValue };
+                string[] contents = { "(old gamedata)", outputName, fontColorS, fontColorS2, gradientS, backColorS, fc.ConvertToString(currentFont), size, location, textAfterChecked.ToString(), textAfterValue };
                 File.WriteAllLines(file, contents);
                 File.AppendAllLines(file, outlinesContent.ToArray());
             }
@@ -808,8 +930,6 @@ namespace CountEmblems
             try
             {
                 string[] contents = File.ReadAllLines(file);
-                fileName = contents[0];
-                gamedataBox.Text = fileName;
                 outputName = contents[1];
                 outputBox.Text = outputName;
 
@@ -926,55 +1046,6 @@ namespace CountEmblems
             }
             CancelEdit(null, null);
         }
-
-        static public void MenuGlobalHotkeys(object sender, EventArgs e)
-        {
-            new Thread(() =>
-            {
-                while(!MainForm.IsHandleCreated)
-                {
-
-                }
-                MainForm.Invoke(new MethodInvoker(delegate
-                {
-                    if (menuGlobalHotkeys.Checked == false)
-                    {
-                        menuGlobalHotkeys.Checked = true;
-                        hotkeysEnabled = true;
-                        TaskbarProgress.SetValue(MainForm.Handle, 100, 100);
-                        TaskbarProgress.SetState(MainForm.Handle, TaskbarProgress.TaskbarStates.Normal);
-
-                    }
-                    else
-                    {
-                        menuGlobalHotkeys.Checked = false;
-                        hotkeysEnabled = false;
-                        TaskbarProgress.SetValue(MainForm.Handle, 100, 100);
-                        TaskbarProgress.SetState(MainForm.Handle, TaskbarProgress.TaskbarStates.Error);
-                    }
-                }));
-            }).Start();
-        }
-
-        static void MenuSetKeys(object sender, EventArgs e)
-        {
-            previousResetKeyCode = ResetKeyCode;
-            previousResetKeyValue = ResetKeyValue;
-            previousEnableKeyCode = EnableKeyCode;
-            previousEnableKeyValue = EnableKeyValue;
-            resetHotkeyText.Text = ResetKeyCode;
-            enableHotkeysText.Text = EnableKeyCode;
-
-            if (KeySetForm.ShowDialog() == DialogResult.OK)
-            {
-                return;
-            }
-            CancelSetKeys(null, null);
-        }
-        static void MenuResetTo0(object sender, EventArgs e)
-        {
-            Reset = true;
-        }
         static void AddConstantLabel(string text, System.Drawing.Point location, Form form)
         {
             System.Windows.Forms.Label label = new System.Windows.Forms.Label();
@@ -982,22 +1053,6 @@ namespace CountEmblems
             label.Location = location;
             label.AutoSize = true;
             form.Controls.Add(label);
-        }
-        static void BrowseGamedata(object sender, EventArgs e)
-        {
-            using (OpenFileDialog openFileDialog2 = new OpenFileDialog())
-            {
-                openFileDialog2.Filter = "Dat files (*.dat)|*.dat";
-                openFileDialog2.RestoreDirectory = true;
-                openFileDialog2.ShowDialog();
-
-                if (openFileDialog2.FileName != "")
-                {
-                    fileName = openFileDialog2.FileName;
-                    Console.WriteLine("Gamedata : " + fileName);
-                    gamedataBox.Text = fileName;
-                }
-            }
         }
         static void BrowseOutput(object sender, EventArgs e)
         {
@@ -1017,14 +1072,11 @@ namespace CountEmblems
         }
         static void OkIO(object sender, EventArgs e)
         {
-            fileName = gamedataBox.Text;
             outputName = outputBox.Text;
         }
         static void CancelIO(object sender, EventArgs e)
         {
-            fileName = previousFileName;
             outputName = previousOutputName;
-            Console.WriteLine("Gamedata : " + fileName);
         }
         enum fontColorId
         {
@@ -1087,20 +1139,6 @@ namespace CountEmblems
                 outlines.Add(new Outline { Color = outline.Color, Thickness = outline.Thickness });
             }
             UpdateText();
-        }
-
-        static void OkSetKeys(object sender, EventArgs e)
-        {
-            
-        }
-        static void CancelSetKeys(object sender, EventArgs e)
-        {
-            ResetKeyCode = previousResetKeyCode;
-            ResetKeyValue = previousResetKeyValue;
-            EnableKeyCode = previousEnableKeyCode;
-            EnableKeyValue = previousEnableKeyValue;
-            resetHotkeyText.Text = previousResetKeyCode;
-            enableHotkeysText.Text = previousEnableKeyCode;
         }
 
         static System.Windows.Forms.Button MakeButton(string text, System.Drawing.Point location, EventHandler eventHandler, Form form)
@@ -1415,9 +1453,6 @@ namespace CountEmblems
             EditForm = MakeForm(new System.Drawing.Size(245, 415), System.Drawing.Color.FromArgb(240, 240, 240), "Edit Layout");
             MainForm.FormClosing += FormExit;
             MainForm.ResizeEnd += ResizeEnd;
-            KeySetForm = MakeForm(new System.Drawing.Size(295, 175), System.Drawing.Color.FromArgb(240, 240, 240), "Hotkey Settings");
-            KeySetForm.FormClosing += KeySetClosing;
-            KeySetForm.Activated += KeySetForm_Activated;
 
             textToShow = "No text\nto display";
             currentFont = new Font("Arial", 20, System.Drawing.FontStyle.Bold, GraphicsUnit.Point);
@@ -1428,16 +1463,7 @@ namespace CountEmblems
             EventHandler SaveAs_L = new EventHandler(MenuSaveAs_L);
             EventHandler Load_L = new EventHandler(MenuLoad_L);
             EventHandler Edit_L = new EventHandler(MenuEdit_L);
-            EventHandler globalHandler = new EventHandler(MenuGlobalHotkeys);
-            EventHandler setKeysHandler = new EventHandler(MenuSetKeys);
-            EventHandler resetTo0Handler = new EventHandler(MenuResetTo0);
 
-            EventHandler resetBindHandler = new EventHandler(resetBind);
-            EventHandler enableBindHandler = new EventHandler(enableBind);
-            EventHandler OkSetKeyHandler = new EventHandler(OkSetKeys);
-            EventHandler CancelSetKeyHandler = new EventHandler(CancelSetKeys);
-
-            EventHandler gamedataButtonHandler = new EventHandler(BrowseGamedata);
             EventHandler outputButtonHandler = new EventHandler(BrowseOutput);
 
             EventHandler OkIOHandler = new EventHandler(OkIO);
@@ -1457,23 +1483,13 @@ namespace CountEmblems
             EventHandler textAfterHandler = new EventHandler(textAfterChanged);
             EventHandler textAfterCheckHandler = new EventHandler(textAfterCheckChanged);
 
-            menuGlobalHotkeys.Text = "Enable Hotkeys";
-            menuGlobalHotkeys.Click += globalHandler;
-
-            menuReset.Text = "Reset emblem count to 0";
-            menuReset.Click += resetTo0Handler;
-
             System.Windows.Forms.ContextMenu menu = new System.Windows.Forms.ContextMenu();
-            menu.MenuItems.Add("Text Input file", IO_Options);
+            menu.MenuItems.Add("Output file", IO_Options);
             menu.MenuItems.Add("-");
             menu.MenuItems.Add("Save layout", Save_L);
             menu.MenuItems.Add("Save layout as...", SaveAs_L);
             menu.MenuItems.Add("Edit layout", Edit_L);
             menu.MenuItems.Add("Load layout", Load_L);
-            menu.MenuItems.Add("-");
-            menu.MenuItems.Add(menuGlobalHotkeys);
-            menu.MenuItems.Add("Set Hotkeys", setKeysHandler);
-            menu.MenuItems.Add(menuReset);
             menu.MenuItems.Add("-");
             menu.MenuItems.Add("Exit", exitHandler);
 
@@ -1486,18 +1502,10 @@ namespace CountEmblems
                 previousTotal = NO_PREVIOUS_TOTAL;
                 while (true)
                 {
-                    Analyze_file(fileName, outputName);
+                    Analyze_file(outputName);
                     Thread.Sleep(100);
                 }
             }).Start();
-
-            AddConstantLabel("Input path:", new System.Drawing.Point(10, 10), IOForm);
-            gamedataBox = new System.Windows.Forms.TextBox();
-            gamedataBox.Text = fileName;
-            gamedataBox.Location = new System.Drawing.Point(10, 30);
-            gamedataBox.Size = new System.Drawing.Size(180, 20);
-            IOForm.Controls.Add(gamedataBox);
-            System.Windows.Forms.Button gamedataButton = MakeButton("Browse", new System.Drawing.Point(200, 30), gamedataButtonHandler, IOForm);
 
             AddConstantLabel("Output file's path:", new System.Drawing.Point(10, 60), IOForm);
             outputBox = new TextBox();
@@ -1658,30 +1666,6 @@ namespace CountEmblems
             buttonCancelEdit.DialogResult = DialogResult.Cancel;
             EditForm.CancelButton = buttonCancelEdit;
 
-            AddConstantLabel("Reset key:", new System.Drawing.Point(10, 10), KeySetForm);
-            resetHotkeyText.Location = new System.Drawing.Point(10, 30);
-            resetHotkeyText.Size = new System.Drawing.Size(180, 20);
-            resetHotkeyText.ReadOnly = true;
-            KeySetForm.Controls.Add(resetHotkeyText);
-            resetBindButton = MakeButton("Bind", new System.Drawing.Point(200, 30), resetBindHandler, KeySetForm);
-            resetBindButton.KeyDown += ResetBindButtonKeyPressed;
-
-            AddConstantLabel("Enable hotkeys key:", new System.Drawing.Point(10, 60), KeySetForm);
-            enableHotkeysText.Location = new System.Drawing.Point(10, 80);
-            enableHotkeysText.Size = new System.Drawing.Size(180, 20);
-            enableHotkeysText.ReadOnly = true;
-            KeySetForm.Controls.Add(enableHotkeysText);
-            enableBindButton = MakeButton("Bind", new System.Drawing.Point(200, 80), enableBindHandler, KeySetForm);
-            enableBindButton.KeyDown += EnableBindButtonKeyPressed;
-
-            Button buttonOkSetKey = MakeButton("OK", new System.Drawing.Point(110, 140), OkSetKeyHandler, KeySetForm);
-            buttonOkSetKey.DialogResult = DialogResult.OK;
-            KeySetForm.AcceptButton = buttonOkSetKey;
-
-            Button buttonCancelSetKey = MakeButton("Cancel", new System.Drawing.Point(200, 140), CancelSetKeyHandler, KeySetForm);
-            buttonCancelSetKey.DialogResult = DialogResult.Cancel;
-            KeySetForm.CancelButton = buttonCancelSetKey;
-
             // Just some default values before loading
             fontColor = System.Drawing.Color.White;
             fontColor2 = System.Drawing.Color.White;
@@ -1710,223 +1694,16 @@ namespace CountEmblems
                 File.Create(PREVIOUS_INI_NAME).Close();
             }
 
-            if (File.Exists("settings.ini"))
-            {
-                LoadSettings();
-            }
-            else
-            {
-                File.Create("settings.ini").Close();
-            }
-
             MainForm.SizeChanged += (o, e) => { MainFormSizeChanged(); };
             MainForm.Controls.Add(renderBox);
             MainForm.Paint += (o, e) => { UpdateText(); };
             Thread.CurrentThread.IsBackground = true;
-            InterceptKeys.SetupHook();
             MainForm.ShowDialog();
-        }
-
-        private static void KeySetForm_Activated(object sender, EventArgs e)
-        {
-            KeySetForm.ActiveControl = null;
-        }
-
-        private static void resetBind(object sender, EventArgs e)
-        {
-            if (isBindingEnable)
-            {
-                isBindingEnable = false;
-                enableBindButton.Text = "Bind";
-            }
-            if (isBindingReset == false)
-            {
-                isBindingReset = true;
-                resetBindButton.Text = "Cancel";
-            }
-            else
-            {
-                isBindingReset = false;
-                resetBindButton.Text = "Bind";
-            }
-        }
-        private static void enableBind(object sender, EventArgs e)
-        {
-            if (isBindingReset)
-            {
-                isBindingReset = false;
-                resetBindButton.Text = "Bind";
-            }
-            if (isBindingEnable == false)
-            {
-                isBindingEnable = true;
-                enableBindButton.Text = "Cancel";
-            }
-            else
-            {
-                isBindingEnable = false;
-                enableBindButton.Text = "Bind";
-            }
-        }
-        private static void EnableBindButtonKeyPressed(object sender, System.Windows.Forms.KeyEventArgs e)
-        {
-            if (isBindingEnable)
-            {
-                EnableKeyValue = e.KeyValue;
-                EnableKeyCode = kc.ConvertToString(EnableKeyValue);
-                enableHotkeysText.Text = EnableKeyCode;
-                KeySetForm.ActiveControl = null;
-                isBindingEnable = false;
-                enableBindButton.Text = "Bind";
-            }
-        }
-        private static void ResetBindButtonKeyPressed(object sender, System.Windows.Forms.KeyEventArgs e)
-        {
-            if (isBindingReset)
-            {
-                ResetKeyValue = e.KeyValue;
-                ResetKeyCode = kc.ConvertToString(ResetKeyValue);
-                resetHotkeyText.Text = ResetKeyCode;
-                KeySetForm.ActiveControl = null;
-                isBindingReset = false;
-                resetBindButton.Text = "Bind";
-            }
         }
 
         private static void MainFormSizeChanged()
         {
             UpdateText();
-        }
-        private static void KeySetClosing(object sender, FormClosingEventArgs e)
-        {
-            if (isBindingEnable || isBindingReset)
-            {
-                e.Cancel = true;
-            }
-        }
-    }
-
-    static class InterceptKeys
-    {
-        private const int WH_KEYBOARD_LL = 13;
-        private const int WM_KEYDOWN = 0x0100;
-        private static LowLevelKeyboardProc _proc = HookCallback;
-        private static IntPtr _hookID = IntPtr.Zero;
-        public static int vkCode;
-
-        public static void SetupHook()
-        {
-            new Thread(() =>
-            {
-                _hookID = SetHook(_proc);
-                Application.Run();
-                UnhookWindowsHookEx(_hookID);
-            }).Start();
-        }
-
-        private static IntPtr SetHook(LowLevelKeyboardProc proc)
-        {
-            using (Process curProcess = Process.GetCurrentProcess())
-            using (ProcessModule curModule = curProcess.MainModule)
-            {
-                return SetWindowsHookEx(WH_KEYBOARD_LL, proc,
-                    GetModuleHandle(curModule.ModuleName), 0);
-            }
-        }
-
-        private delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
-
-        private static IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
-        {
-            if (nCode >= 0 && wParam == (IntPtr)WM_KEYDOWN)
-            {
-                vkCode = Marshal.ReadInt32(lParam);
-            }
-            else
-            {
-                vkCode = -1;
-            }
-            if (vkCode == Program.ResetKeyValue && Program.hotkeysEnabled == true && Program.canReset == true)
-            {
-                Program.Reset = true;
-            }
-            if (vkCode == Program.EnableKeyValue)
-            {
-                Program.MenuGlobalHotkeys(null, null);
-            }
-            return CallNextHookEx(_hookID, nCode, wParam, lParam);
-        }
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelKeyboardProc lpfn, IntPtr hMod, uint dwThreadId);
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool UnhookWindowsHookEx(IntPtr hhk);
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
-
-        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        private static extern IntPtr GetModuleHandle(string lpModuleName);
-    }
-    public static class TaskbarProgress
-    {
-        public enum TaskbarStates
-        {
-            NoProgress = 0,
-            Indeterminate = 0x1,
-            Normal = 0x2,
-            Error = 0x4,
-            Paused = 0x8
-        }
-
-        [ComImport()]
-        [Guid("ea1afb91-9e28-4b86-90e9-9e9f8a5eefaf")]
-        [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-        private interface ITaskbarList3
-        {
-            // ITaskbarList
-            [PreserveSig]
-            void HrInit();
-            [PreserveSig]
-            void AddTab(IntPtr hwnd);
-            [PreserveSig]
-            void DeleteTab(IntPtr hwnd);
-            [PreserveSig]
-            void ActivateTab(IntPtr hwnd);
-            [PreserveSig]
-            void SetActiveAlt(IntPtr hwnd);
-
-            // ITaskbarList2
-            [PreserveSig]
-            void MarkFullscreenWindow(IntPtr hwnd, [MarshalAs(UnmanagedType.Bool)] bool fFullscreen);
-
-            // ITaskbarList3
-            [PreserveSig]
-            void SetProgressValue(IntPtr hwnd, UInt64 ullCompleted, UInt64 ullTotal);
-            [PreserveSig]
-            void SetProgressState(IntPtr hwnd, TaskbarStates state);
-        }
-
-        [ComImport()]
-        [Guid("56fdf344-fd6d-11d0-958a-006097c9a090")]
-        [ClassInterface(ClassInterfaceType.None)]
-        private class TaskbarInstance
-        {
-        }
-
-        private static ITaskbarList3 taskbarInstance = (ITaskbarList3)new TaskbarInstance();
-        private static bool taskbarSupported = Environment.OSVersion.Version >= new Version(6, 1);
-
-        public static void SetState(IntPtr windowHandle, TaskbarStates taskbarState)
-        {
-            if (taskbarSupported) taskbarInstance.SetProgressState(windowHandle, taskbarState);
-        }
-
-        public static void SetValue(IntPtr windowHandle, double progressValue, double progressMax)
-        {
-            if (taskbarSupported) taskbarInstance.SetProgressValue(windowHandle, (ulong)progressValue, (ulong)progressMax);
         }
     }
 }
